@@ -75,8 +75,9 @@ class VQADataset(Dataset):
             resize = transforms.Resize(size=(224, 224))
             image = resize(image)
 
+            # this also divides by 255 TODO we can normalize too
             image_tensor = TF.to_tensor(image)
-            return image_tensor, question_string, answer_dict
+            return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
 
         except:
             print('ERROR [!] : exception in __getitem__')
@@ -129,7 +130,7 @@ if __name__ == '__main__':
                                    questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                    images_path='data/images',
                                    phase='train')
-    train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=False,
+    train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                                    collate_fn=lambda x: x)
     for i_batch, sample_batched in enumerate(train_dataloader):
         print(i_batch, sample_batched)
