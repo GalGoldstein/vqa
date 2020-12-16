@@ -84,7 +84,7 @@ def main():
     print(train.word_vectors.shape)
     #
     # train_dataloader = DataLoader(train, shuffle=True)
-    # model = KiperwasserDependencyParser(train, hidden_dim, MLP_inner_dim, BiLSTM_layers, dropout_layers_probability)
+    # xception = KiperwasserDependencyParser(train, hidden_dim, MLP_inner_dim, BiLSTM_layers, dropout_layers_probability)
     #
     # """TEST DATA"""
     #
@@ -94,7 +94,7 @@ def main():
     #
     # """TRAIN THE PARSER ON TRAIN DATA"""
     # train_accuracy_list, train_loss_list, test_accuracy_list, test_loss_list = \
-    #     train_kiperwasser_parser(model, train_dataloader, test_dataloader, epochs, learning_rate, weight_decay, alpha,
+    #     train_kiperwasser_parser(xception, train_dataloader, test_dataloader, epochs, learning_rate, weight_decay, alpha,
     #                              path_to_save_model)
     #
     # print(f'\ntrain_accuracy_list = {train_accuracy_list}'

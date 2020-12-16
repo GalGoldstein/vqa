@@ -72,7 +72,7 @@ class VQADataset(Dataset):
             # TODO - set parameter for resize in args
             #  what is the size we want?
             # Resize
-            resize = transforms.Resize(size=(224, 224))
+            resize = transforms.Resize(size=(299, 299))
             image = resize(image)
 
             # this also divides by 255 TODO we can normalize too
@@ -132,13 +132,13 @@ if __name__ == '__main__':
                                    phase='train')
     train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                                    collate_fn=lambda x: x)
-    for i_batch, sample_batched in enumerate(train_dataloader):
-        print(i_batch, sample_batched)
+    for i_batch, batch in enumerate(train_dataloader):
+        print(i_batch, batch)
 
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
                                  images_path='data/images',
                                  phase='val')
     val_dataloader = torch.utils.data.DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
-    for i_batch, sample_batched in enumerate(val_dataloader):
-        print(i_batch, sample_batched)
+    for i_batch, batch in enumerate(val_dataloader):
+        print(i_batch, batch)
