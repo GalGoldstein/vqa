@@ -96,12 +96,12 @@ if __name__ == '__main__':
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
     print(f'============ # Parameters: {n_params}============')
-    epochs = 50
+    epochs = 5
     for epoch in range(epochs):
         epoch_losses = list()
         epoch_start_time = time.time()
@@ -125,6 +125,5 @@ if __name__ == '__main__':
             loss.backward()
             epoch_losses.append(loss.item())
             optimizer.step()
-            break
         print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
