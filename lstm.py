@@ -63,8 +63,8 @@ class my_LSTM(nn.Module):
         question_indexes = [word_idx_mappings[i] if i in word_idx_mappings.keys() else
                             word_idx_mappings['<unk>'] for i in question]
         question_embeddings = torch.stack([word_vectors[i] for i in question_indexes], dim=0)
-        questions_output = lstm(question_embeddings[None, ...])
-        lstm_out, _ = self.encoder(sample)
+        # questions_output = lstm(question_embeddings[None, ...])
+        lstm_out, _ = self.encoder(question_embeddings[None, ...])
         return lstm_out[0][-1]  # return only last hidden state, of the last layer of LSTM
 
 
@@ -97,10 +97,7 @@ if __name__ == "__main__":
     for i_batch, batch in enumerate(train_dataloader):
         for i_sample, sample in enumerate(batch):
             """processing for a single image"""
-
-
             questions_output = lstm(batch[i_sample]['question'])
-
             print(questions_output.shape)
     # one batch
     # all_questions_embeddings = []
