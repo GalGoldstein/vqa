@@ -37,9 +37,8 @@ class VQA(nn.Module):
 
         return torch.tensor(all_answers)
 
-    def forward(self, images_batch, questions_batch):
+    def forward(self, images_batch, questions_representation):
         images_representation = self.cnn(images_batch)
-        questions_representation = torch.stack([self.lstm(question) for question in questions_batch], dim=0)
         pointwise_mul = torch.mul(images_representation, questions_representation)
 
         return self.fc(pointwise_mul)
@@ -49,6 +48,8 @@ if __name__ == '__main__':
     compute_targets()
     running_on_linux = 'Linux' in platform.platform()
 
+    print()
+    print("VQADataset")
     if running_on_linux:
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
@@ -79,13 +80,17 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
+    print("DataLoader")
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=4, shuffle=True, collate_fn=lambda x: x)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=4, shuffle=True, collate_fn=lambda x: x)
 
     lstm_params_ = {'word_embd_dim': 100, 'lstm_hidden_dim': 2048, 'n_layers': 1,
                     'train_question_path': train_questions_json_path}
+
+    print("model")
     model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_)
     model.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    model.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else model.device  # TODO delete
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss()
@@ -100,14 +105,19 @@ if __name__ == '__main__':
 
             # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
+
+            # questions
             questions_batch_ = [sample['question'] for sample in batch]
+            questions_representation_ = torch.stack([model.lstm(question) for question in questions_batch_],
+                                                    dim=0).to(model.device)
+
+            # answers
             answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
             target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
-            output = model(images_batch_, questions_batch_)
+            output = model(images_batch_, questions_representation_)
             loss = criterion(output, target)
             loss.backward()
             epoch_losses.append(loss.item())
             optimizer.step()
-            print(f'epoch: {epoch}, batch: {i_batch + 1}')
         print(f"epoch {epoch + 1} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
