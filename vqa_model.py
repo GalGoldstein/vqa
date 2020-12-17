@@ -51,17 +51,17 @@ if __name__ == '__main__':
 
     if running_on_linux:
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
-                                       questions_json_path='datashare/v2_OpenEnded_mscoco_train2014_questions.json',
-                                       images_path='datashare',
+                                       questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
+                                       images_path='/datashare',
                                        phase='train')
 
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
-                                     questions_json_path='datashare/v2_OpenEnded_mscoco_val2014_questions.json',
-                                     images_path='datashare',
+                                     questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
+                                     images_path='/datashare',
                                      phase='val')
 
-        train_questions_json_path = 'datashare/v2_OpenEnded_mscoco_train2014_questions.json'
-        val_questions_json_path = 'datashare/v2_OpenEnded_mscoco_val2014_questions.json'
+        train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'
+        val_questions_json_path = '/datashare/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     else:
