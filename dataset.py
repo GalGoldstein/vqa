@@ -4,6 +4,7 @@ import io
 import numpy as np
 import json
 import pickle
+import platform
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from PIL import Image
@@ -33,11 +34,13 @@ class VQADataset(Dataset):
         self.questions = json.load(open(questions_json_path))['questions']
         self.img_path = images_path
         self.phase = phase
-        torch.nn.LSTM
+
         # TODO delete next 3 lines: only for verifying everything works (verify image in path)
-        images = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
-        self.target = [target for target in self.target if target['image_id'] in images]
-        self.questions = [question for question in self.questions if question['image_id'] in images]
+        running_on_linux = 'Linux' in platform.platform()
+        if not running_on_linux:
+            images = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
+            self.target = [target for target in self.target if target['image_id'] in images]
+            self.questions = [question for question in self.questions if question['image_id'] in images]
 
     def __len__(self):
         return len(self.target)
