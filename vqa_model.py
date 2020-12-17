@@ -108,14 +108,14 @@ if __name__ == '__main__':
 
             # questions
             questions_batch_ = [sample['question'] for sample in batch]
-            questions_representation_ = torch.stack([model.lstm(question) for question in questions_batch_],
-                                                    dim=0).to(model.device)
+            questions_represents = torch.stack([model.lstm(question).to(model.device) for question in questions_batch_],
+                                               dim=0).to(model.device)
 
             # answers
             answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
             target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
-            output = model(images_batch_, questions_representation_)
+            output = model(images_batch_, questions_represents)
             loss = criterion(output, target)
             loss.backward()
             epoch_losses.append(loss.item())
