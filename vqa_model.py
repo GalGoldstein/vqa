@@ -99,7 +99,7 @@ if __name__ == '__main__':
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 
     print('============ Starting training ============')
-    n_params = sum([len(params.detach().numpy().flatten()) for params in list(model.parameters())])
+    n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
     print(f'============ # Parameters: {n_params}============')
     epochs = 50
     for epoch in range(epochs):
