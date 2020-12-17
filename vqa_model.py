@@ -91,6 +91,8 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 
+    print()
+    print(model.device)
     for epoch in range(50):
         epoch_losses = list()
         for i_batch, batch in enumerate(train_dataloader):
@@ -100,13 +102,12 @@ if __name__ == '__main__':
             images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
             questions_batch_ = [sample['question'] for sample in batch]
             answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
-            target = model.answers_to_one_hot(answers_labels_batch_)
+            target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
             output = model(images_batch_, questions_batch_)
-
             loss = criterion(output, target)
             loss.backward()
             epoch_losses.append(loss.item())
             optimizer.step()
-
-        print(f"epoch {epoch} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
+            print(f'epoch: {epoch}, batch: {i_batch + 1}')
+        print(f"epoch {epoch + 1} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
