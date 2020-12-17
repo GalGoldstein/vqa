@@ -101,7 +101,7 @@ if __name__ == '__main__':
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
     print(f'============ # Parameters: {n_params}============')
-    epochs = 5
+    epochs = 50
     for epoch in range(epochs):
         epoch_losses = list()
         epoch_start_time = time.time()
@@ -127,3 +127,7 @@ if __name__ == '__main__':
             optimizer.step()
         print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
+
+# TODO:
+#  1. insert lstm back to forward
+#  2. add evaluate on validation set
