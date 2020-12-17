@@ -54,8 +54,6 @@ if __name__ == '__main__':
     compute_targets()
     running_on_linux = 'Linux' in platform.platform()
 
-    print()
-    print("VQADataset")
     if running_on_linux:
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
@@ -86,22 +84,18 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    print("DataLoader")
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=4, shuffle=True, collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=4, shuffle=True, collate_fn=lambda x: x)
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=64, shuffle=True, collate_fn=lambda x: x)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=64, shuffle=True, collate_fn=lambda x: x)
 
     lstm_params_ = {'word_embd_dim': 100, 'lstm_hidden_dim': 2048, 'n_layers': 1,
                     'train_question_path': train_questions_json_path}
 
-    print("model")
     model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_)
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 
-    print()
-    print(model.device)
     for epoch in range(50):
         epoch_losses = list()
         for i_batch, batch in enumerate(train_dataloader):
