@@ -11,6 +11,7 @@ import cnn
 import lstm
 import pickle
 import platform
+import time
 
 
 class VQA(nn.Module):
@@ -52,6 +53,7 @@ class VQA(nn.Module):
 
 if __name__ == '__main__':
     compute_targets()
+
     running_on_linux = 'Linux' in platform.platform()
 
     if running_on_linux:
@@ -96,8 +98,13 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 
-    for epoch in range(50):
+    print('============ Starting training ============')
+    n_params = sum([len(params.detach().numpy().flatten()) for params in list(model.parameters())])
+    print(f'============ # Parameters: {n_params}============')
+    epochs = 50
+    for epoch in range(epochs):
         epoch_losses = list()
+        epoch_start_time = time.time()
         for i_batch, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
 
@@ -118,4 +125,6 @@ if __name__ == '__main__':
             loss.backward()
             epoch_losses.append(loss.item())
             optimizer.step()
-        print(f"epoch {epoch + 1} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
+            break
+        print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
+        print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
