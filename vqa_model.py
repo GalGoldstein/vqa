@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from dataset import VQADataset
+from compute_softscore import compute_targets
 import numpy as np
 import cnn
 import lstm
@@ -45,6 +46,7 @@ class VQA(nn.Module):
 
 
 if __name__ == '__main__':
+    compute_targets()
     running_on_linux = 'Linux' in platform.platform()
 
     if running_on_linux:

@@ -264,9 +264,9 @@ def load_v2():
     compute_target(val_answers, ans2label, 'val', "data/cache")
 
 
-def main():
+def compute_targets():
     load_v2()
 
 
 if __name__ == '__main__':
-    main()
+    compute_targets()
