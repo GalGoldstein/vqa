@@ -18,6 +18,7 @@ import dataset
 UNKNOWN_TOKEN = "<unk_token>"
 SPECIAL_TOKENS = [UNKNOWN_TOKEN]
 
+
 def get_vocabs_counts(list_of_paths):
     """
         creates dictionary with number of appearances (counts) of each word
@@ -88,14 +89,15 @@ if __name__ == "__main__":
     lstm = my_LSTM(word_embd_dim, hidden_dim, BiLSTM_layers)
     # one sample
     for i_batch, batch in enumerate(train_dataloader):
-        """processing for a single image"""
-        question = batch[0]['question'].split(' ')
-        question_indexes = [word_idx_mappings[i] if i in word_idx_mappings.keys() else
-                            word_idx_mappings['<unk>'] for i in question]
-        question_embeddings = torch.stack([word_vectors[i] for i in question_indexes], dim=0)
-        questions_output = lstm(question_embeddings[None, ...])
+        for i_sample, sample in enumerate(batch):
+            """processing for a single image"""
+            question = batch[i_sample]['question'].split(' ')
+            question_indexes = [word_idx_mappings[i] if i in word_idx_mappings.keys() else
+                                word_idx_mappings['<unk>'] for i in question]
+            question_embeddings = torch.stack([word_vectors[i] for i in question_indexes], dim=0)
+            questions_output = lstm(question_embeddings[None, ...])
 
-        print(questions_output.shape)
+            print(questions_output.shape)
     # one batch
     # all_questions_embeddings = []
     # for i_batch, batch in enumerate(train_dataloader):

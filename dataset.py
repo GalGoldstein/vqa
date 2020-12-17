@@ -125,20 +125,62 @@ class VQADataset(Dataset):
 #         return len(self.image_paths)
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
+#     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
+#                                    questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
+#                                    images_path='data/images',
+#                                    phase='train')
+#     train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
+#                                                    collate_fn=lambda x: x)
+#     for i_batch, batch in enumerate(train_dataloader):
+#         print(i_batch, batch)
+#
+#     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
+#                                  questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
+#                                  images_path='data/images',
+#                                  phase='val')
+#     val_dataloader = torch.utils.data.DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
+#     for i_batch, batch in enumerate(val_dataloader):
+#         print(i_batch, batch)
+
+
+def get_data_loaders():
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                    images_path='data/images',
                                    phase='train')
-    train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
+    train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=False,
                                                    collate_fn=lambda x: x)
-    for i_batch, batch in enumerate(train_dataloader):
-        print(i_batch, batch)
+    # for i_batch, sample_batched in enumerate(train_dataloader):
+    #     print(i_batch, sample_batched)
 
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
                                  images_path='data/images',
                                  phase='val')
     val_dataloader = torch.utils.data.DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
-    for i_batch, batch in enumerate(val_dataloader):
-        print(i_batch, batch)
+    # for i_batch, sample_batched in enumerate(val_dataloader):
+    #     print(i_batch, sample_batched)
+
+    return train_dataloader, val_dataloader
+
+
+if __name__ == '__main__':
+    get_data_loaders()
+    # vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
+    #                                questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
+    #                                images_path='data/images',
+    #                                phase='train')
+    # train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
+    #                                                collate_fn=lambda x: x)
+    # for i_batch, sample_batched in enumerate(train_dataloader):
+    #     print(i_batch, sample_batched)
+    #
+    # vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
+    #                              questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
+    #                              images_path='data/images',
+    #                              phase='val')
+    # val_dataloader = torch.utils.data.DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
+    # for i_batch, sample_batched in enumerate(val_dataloader):
+    #     print(i_batch, sample_batched)
+
