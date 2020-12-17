@@ -84,8 +84,8 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=64, shuffle=True, collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=64, shuffle=True, collate_fn=lambda x: x)
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=32, shuffle=True, collate_fn=lambda x: x)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=32, shuffle=True, collate_fn=lambda x: x)
 
     lstm_params_ = {'word_embd_dim': 100, 'lstm_hidden_dim': 2048, 'n_layers': 1,
                     'train_question_path': train_questions_json_path}
