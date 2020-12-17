@@ -89,6 +89,8 @@ def create_dir(path):
 
 
 def get_score(occurences):
+    # TODO This is not aligned with https://visualqa.org/evaluation.html
+    #  ask Itay - how are you going to evaluate us?
     if occurences == 0:
         return 0
     elif occurences == 1:
