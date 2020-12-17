@@ -16,11 +16,14 @@ import platform
 class VQA(nn.Module):
     def __init__(self, lstm_params, label2ans_path, fc_size=2048):
         super(VQA, self).__init__()
-        self.cnn = cnn.Xception()
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device  # TODO delete
+
+        self.cnn = cnn.Xception().to(self.device)
         self.lstm = lstm.LSTM(lstm_params['word_embd_dim'],
                               lstm_params['lstm_hidden_dim'],
                               lstm_params['n_layers'],
-                              lstm_params['train_question_path'])
+                              lstm_params['train_question_path']).to(self.device)
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
@@ -89,8 +92,6 @@ if __name__ == '__main__':
 
     print("model")
     model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_)
-    model.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-    model.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else model.device  # TODO delete
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss()
