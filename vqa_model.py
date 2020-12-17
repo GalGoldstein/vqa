@@ -17,13 +17,16 @@ class VQA(nn.Module):
     def __init__(self, lstm_params, label2ans_path, fc_size=2048):
         super(VQA, self).__init__()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device  # TODO delete
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.cnn = cnn.Xception().to(self.device)
+        self.cnn.device = self.device
+
         self.lstm = lstm.LSTM(lstm_params['word_embd_dim'],
                               lstm_params['lstm_hidden_dim'],
                               lstm_params['n_layers'],
                               lstm_params['train_question_path']).to(self.device)
+        self.lstm.device = self.device
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
@@ -34,7 +37,7 @@ class VQA(nn.Module):
         for labels_count_dict in answers_labels_batch:
             if labels_count_dict:  # not empty dict
                 target_class = max(labels_count_dict, key=labels_count_dict.get)
-            else:  # TODO continue
+            else:
                 target_class = self.num_classes  # last class is used for the questions without an answer
             all_answers.append(target_class)
 
@@ -109,8 +112,8 @@ if __name__ == '__main__':
 
             # questions
             questions_batch_ = [sample['question'] for sample in batch]
-            questions_represents = torch.stack([model.lstm(question).to(model.device) for question in questions_batch_],
-                                               dim=0).to(model.device)
+            questions = [model.lstm(model.lstm.words_to_idx(question)) for question in questions_batch_]
+            questions_represents = torch.stack(questions, dim=0).to(model.device)
 
             # answers
             answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]

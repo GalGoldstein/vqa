@@ -25,7 +25,8 @@ class LSTM(nn.Module):
 
         self.word_embedding = nn.Embedding.from_pretrained(word_vectors, freeze=False)
 
-        self.encoder = nn.LSTM(input_size=word_embd_dim, hidden_size=lstm_hidden_dim, num_layers=n_layers, batch_first=True)
+        self.encoder = nn.LSTM(input_size=word_embd_dim, hidden_size=lstm_hidden_dim, num_layers=n_layers,
+                               batch_first=True)
 
     def get_vocabs_counts(self):
         """
@@ -48,12 +49,10 @@ class LSTM(nn.Module):
         question = sentence.split(' ')
         question_word_idx_tensor = torch.tensor([self.word_idx_mappings[i] if i in self.word_idx_mappings else
                                                  self.word_idx_mappings['<unk>'] for i in question])
-        return question_word_idx_tensor
+        return question_word_idx_tensor.to(self.device)
 
-    def forward(self, sentence: str):
-        word_idx_tensor = self.words_to_idx(sentence)
+    def forward(self, word_idx_tensor):
         word_embeddings = self.word_embedding(word_idx_tensor)
-
         output, _ = self.encoder(word_embeddings[None, ...])  # TODO currently supporting only a single sentence
         return output[0][-1]  # return only last hidden state, of the last layer of LSTM
 

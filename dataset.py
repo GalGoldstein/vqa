@@ -14,7 +14,7 @@ import torchvision.transforms.functional as TF
 
 
 class VQADataset(Dataset):
-    # TODO:
+    # TODO hyperparameters:
     #  1. Resize image
     #  2. Any kind of augmentation? crop? flip?
 
