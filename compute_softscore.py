@@ -9,6 +9,7 @@ import sys
 import json
 import re
 import pickle as cPickle
+import platform
 import errno
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -247,16 +248,18 @@ def get_question(qid, questions):
 
 
 def load_v2():
-    train_answer_file = 'data/v2_mscoco_train2014_annotations.json'
+    running_on_linux = 'Linux' in platform.platform()
+
+    train_answer_file = 'datashare/' if running_on_linux else 'data/' + 'v2_mscoco_train2014_annotations.json'
     with open(train_answer_file) as f:
         train_answers = json.load(f)['annotations']
 
-    val_answer_file = 'data/v2_mscoco_val2014_annotations.json'
+    val_answer_file = 'datashare/' if running_on_linux else 'data/' + 'v2_mscoco_val2014_annotations.json'
     with open(val_answer_file) as f:
         val_answers = json.load(f)['annotations']
 
     occurence = filter_answers(train_answers, min_occurence=9)
-    ans2label = create_ans2label(occurence, 'trainval', "data/cache")
+    ans2label = create_ans2label(occurence, 'train', "data/cache")
     compute_target(train_answers, ans2label, 'train', "data/cache")
     compute_target(val_answers, ans2label, 'val', "data/cache")
 

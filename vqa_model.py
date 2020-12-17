@@ -2,41 +2,109 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
 from torch.utils.data import DataLoader
 from dataset import VQADataset
+import numpy as np
 import cnn
-import lstm  # TODO
+import lstm
+import pickle
+import platform
 
 
 class VQA(nn.Module):
-    def __init__(self):
+    def __init__(self, lstm_params, label2ans_path, fc_size=2048):
         super(VQA, self).__init__()
         self.cnn = cnn.Xception()
-        self.lstm = lstm.LSTM()
+        self.lstm = lstm.LSTM(lstm_params['word_embd_dim'],
+                              lstm_params['lstm_hidden_dim'],
+                              lstm_params['n_layers'],
+                              lstm_params['train_question_path'])
+
+        self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
+        self.num_classes = len(self.lbl2ans)
+        self.fc = nn.Linear(fc_size, self.num_classes + 1)  # +1 for questions with answer that has no class
+
+    def answers_to_one_hot(self, answers_labels_batch):
+        all_answers = list()
+        for labels_count_dict in answers_labels_batch:
+            if labels_count_dict:  # not empty dict
+                target_class = max(labels_count_dict, key=labels_count_dict.get)
+            else:  # TODO continue
+                target_class = self.num_classes  # last class is used for the questions without an answer
+            all_answers.append(target_class)
+
+        return torch.tensor(all_answers)
 
     def forward(self, images_batch, questions_batch):
         images_representation = self.cnn(images_batch)
-        questions_representation = self.lstm(questions_batch)
-        return images_representation, questions_representation
+        questions_representation = torch.stack([self.lstm(question) for question in questions_batch], dim=0)
+        pointwise_mul = torch.mul(images_representation, questions_representation)
+
+        return self.fc(pointwise_mul)
 
 
 if __name__ == '__main__':
-    vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
-                                   questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
-                                   images_path='data/images',
-                                   phase='train')
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
+    running_on_linux = 'Linux' in platform.platform()
 
-    model = VQA()
+    if running_on_linux:
+        vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
+                                       questions_json_path='datashare/v2_OpenEnded_mscoco_train2014_questions.json',
+                                       images_path='datashare',
+                                       phase='train')
 
-    for i_batch, batch in enumerate(train_dataloader):
-        """processing for a batch"""
+        vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
+                                     questions_json_path='datashare/v2_OpenEnded_mscoco_val2014_questions.json',
+                                     images_path='datashare',
+                                     phase='val')
 
-        # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
-        images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0)
-        questions_batch_ = None  # TODO
+        train_questions_json_path = 'datashare/v2_OpenEnded_mscoco_train2014_questions.json'
+        val_questions_json_path = 'datashare/v2_OpenEnded_mscoco_val2014_questions.json'
+        label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-        batch_image_output = model(images_batch_, questions_batch_)
+    else:
+        vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
+                                       questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
+                                       images_path='data/images',
+                                       phase='train')
 
-        breakpoint()
-        break
+        vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
+                                     questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
+                                     images_path='data/images',
+                                     phase='val')
+
+        train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
+        val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
+        label2ans_path_ = 'data/cache/train_label2ans.pkl'
+
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=4, shuffle=True, collate_fn=lambda x: x)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=4, shuffle=True, collate_fn=lambda x: x)
+
+    lstm_params_ = {'word_embd_dim': 100, 'lstm_hidden_dim': 2048, 'n_layers': 1,
+                    'train_question_path': train_questions_json_path}
+    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_)
+    model.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    model = model.to(model.device)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+
+    for epoch in range(50):
+        epoch_losses = list()
+        for i_batch, batch in enumerate(train_dataloader):
+            optimizer.zero_grad()
+
+            # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
+            images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
+            questions_batch_ = [sample['question'] for sample in batch]
+            answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
+            target = model.answers_to_one_hot(answers_labels_batch_)
+
+            output = model(images_batch_, questions_batch_)
+
+            loss = criterion(output, target)
+            loss.backward()
+            epoch_losses.append(loss.item())
+            optimizer.step()
+
+        print(f"epoch {epoch} mean loss: {round(float(np.mean(epoch_losses)), 4)}")

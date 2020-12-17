@@ -24,7 +24,7 @@ class VQADataset(Dataset):
         parameters:
             target_pickle_path: (str) path to pickle file produced with compute_softscore.py
                 e.g. 'val_target.pkl'
-            questions_json_path: (str) path to json with questions
+            train_questions_json_path: (str) path to json with questions
                 e.g. 'v2_OpenEnded_mscoco_val2014_questions.json'
             images_path: (str) path to dir containing 'train2014' and 'val2014' folders
             phase: (str) 'train' / 'val'

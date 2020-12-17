@@ -1,32 +1,39 @@
 from torchtext.vocab import Vocab
-from torch.utils.data.dataset import Dataset
 from collections import Counter
 from collections import defaultdict
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data.dataloader import DataLoader
 import re
-import matplotlib.pyplot as plt
-import time
-import os
 import json
-import dataset
-
-UNKNOWN_TOKEN = "<unk_token>"
-SPECIAL_TOKENS = [UNKNOWN_TOKEN]
 
 
-def get_vocabs_counts(list_of_paths):
-    """
-        creates dictionary with number of appearances (counts) of each word
-    """
-    word_dict = defaultdict(int)
+class LSTM(nn.Module):
+    def __init__(self, word_embd_dim, lstm_hidden_dim, n_layers, train_question_path):
+        super(LSTM, self).__init__()
+        self.train_question_path = train_question_path
 
-    for file_path in list_of_paths:  # paths for Questions.json files
-        with open(file_path) as json_file:
+        # Build word dict and init word embeddings #
+        self.word_dict = self.get_vocabs_counts()
+
+        # TODO hyper parameters: min_freq, specials?
+        #  pre-processing of questions words? lower?
+        vocab = Vocab(Counter(self.word_dict), vectors=None, min_freq=1, specials=['<unk>'])
+        # set rand vectors and get the weights (the vector embeddings themselves)
+        words_embeddings_tensor = nn.Embedding(len(vocab.stoi), word_embd_dim).weight.data
+        vocab.set_vectors(stoi=vocab.stoi, vectors=words_embeddings_tensor, dim=word_embd_dim)
+        self.word_idx_mappings, self.idx_word_mappings, word_vectors = vocab.stoi, vocab.itos, vocab.vectors
+
+        self.word_embedding = nn.Embedding.from_pretrained(word_vectors, freeze=False)
+
+        self.encoder = nn.LSTM(input_size=word_embd_dim, hidden_size=lstm_hidden_dim, num_layers=n_layers, batch_first=True)
+
+    def get_vocabs_counts(self):
+        """
+            creates dictionary with number of appearances (counts) of each word
+        """
+        word_dict = defaultdict(int)
+
+        with open(self.train_question_path) as json_file:
             data = json.load(json_file)
             for q_object in data['questions']:
                 words = re.split(' ', q_object['question'])
@@ -35,86 +42,22 @@ def get_vocabs_counts(list_of_paths):
                         word_dict[word] += 1
                     else:
                         word_dict[word] = 1
-    return word_dict
+        return word_dict
 
+    def words_to_idx(self, sentence: str):
+        question = sentence.split(' ')
+        question_word_idx_tensor = torch.tensor([self.word_idx_mappings[i] if i in self.word_idx_mappings else
+                                                 self.word_idx_mappings['<unk>'] for i in question])
+        return question_word_idx_tensor
 
-def get_vocabs_counts_list_of_words(list_of_words):
-    """
-        creates dictionary with number of appearances (counts) of each word
-    """
-    word_dict = defaultdict(int)
+    def forward(self, sentence: str):
+        word_idx_tensor = self.words_to_idx(sentence)
+        word_embeddings = self.word_embedding(word_idx_tensor)
 
-    for question in list_of_words:  # paths for Questions.json files
-        for word in question:
-            if word in word_dict.keys():
-                word_dict[word] += 1
-            else:
-                word_dict[word] = 1
-    return word_dict
-
-
-class my_LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim, BiLSTM_layers):
-        super(my_LSTM, self).__init__()
-        self.encoder = nn.LSTM(input_size=input_dim, hidden_size=hidden_dim, num_layers=BiLSTM_layers, batch_first=True)
-
-    def forward(self, sample):  # this is required function. can't change its name
-        question = sample.split(' ')
-        question_indexes = [word_idx_mappings[i] if i in word_idx_mappings.keys() else
-                            word_idx_mappings['<unk>'] for i in question]
-        question_embeddings = torch.stack([word_vectors[i] for i in question_indexes], dim=0)
-        # questions_output = lstm(question_embeddings[None, ...])
-        lstm_out, _ = self.encoder(question_embeddings[None, ...])
-        return lstm_out[0][-1]  # return only last hidden state, of the last layer of LSTM
+        output, _ = self.encoder(word_embeddings[None, ...])  # TODO currently supporting only a single sentence
+        return output[0][-1]  # return only last hidden state, of the last layer of LSTM
 
 
 if __name__ == "__main__":
-    word_embd_dim = 100
-    hidden_dim = 125
-    BiLSTM_layers = 2  # article's default
-    dropout_layers_probability = 0.0  # nn.LSTM default
-
-    ### Build word dict and init word embeddings ###
-    train_word_dict = get_vocabs_counts(['data/v2_OpenEnded_mscoco_train2014_questions.json'])
-
-    vocab = Vocab(Counter(train_word_dict), vectors=None, min_freq=1)
-    # set rand vectors and get the weights (the vector embeddings themselves)
-    words_embeddings_tensor = nn.Embedding(len(vocab.stoi), word_embd_dim).weight.data
-    vocab.set_vectors(stoi=vocab.stoi, vectors=words_embeddings_tensor, dim=word_embd_dim)
-    word_idx_mappings, idx_word_mappings, word_vectors = vocab.stoi, vocab.itos, vocab.vectors
-
-    ### new sample into lstm model ###
-    lstm = my_LSTM(word_embd_dim, hidden_dim, BiLSTM_layers)
-    # one sample
-    from dataset import VQADataset
-
-    vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
-                                   questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
-                                   images_path='data/images',
-                                   phase='train')
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
-
-    for i_batch, batch in enumerate(train_dataloader):
-        for i_sample, sample in enumerate(batch):
-            """processing for a single image"""
-            questions_output = lstm(batch[i_sample]['question'])
-            print(questions_output.shape)
-    # one batch
-    # all_questions_embeddings = []
-    # for i_batch, batch in enumerate(train_dataloader):
-    #     """processing for a single image"""
-    #     for index_s, s in enumerate(batch):
-    #         question = batch[index_s]['question'].split(' ')
-    #         question_indexes = [train.word_idx_mappings[i] if i in train.word_idx_mappings.keys() else
-    #                     train.word_idx_mappings['<unk>'] for i in question]
-    #         question_embeddings = torch.stack([train.word_vectors[i] for i in question_indexes], dim=0)
-    #
-    #         # print(question_embeddings)
-    #         # word_embeddings = torch.FloatTensor(question_embeddings)
-    #         # print(word_embeddings)
-    #         all_questions_embeddings.append(question_embeddings)
-    #     all_questions_embeddings = torch.stack(all_questions_embeddings, dim=0)
-    #     print(all_questions_embeddings.shape)
-
-    # questions_output = lstm(all_questions_embeddings)
-    # print(questions_output)
+    lstm = LSTM(100, 1024, 2, 'data/v2_OpenEnded_mscoco_train2014_questions.json')
+    out = lstm('Where is he looking?')
