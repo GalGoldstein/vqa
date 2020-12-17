@@ -31,6 +31,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
 
 class SeparableConv2d(nn.Module):
@@ -196,8 +197,7 @@ if __name__ == "__main__":
                                    questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                    images_path='data/images',
                                    phase='train')
-    train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
-                                                   collate_fn=lambda x: x)
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
 
     xception = Xception()
 

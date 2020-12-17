@@ -5,6 +5,7 @@ import numpy as np
 import json
 import pickle
 from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 from PIL import Image
 from torchvision import transforms
 import random
@@ -32,7 +33,7 @@ class VQADataset(Dataset):
         self.questions = json.load(open(questions_json_path))['questions']
         self.img_path = images_path
         self.phase = phase
-
+        torch.nn.LSTM
         # TODO delete next 3 lines: only for verifying everything works (verify image in path)
         images = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
         self.target = [target for target in self.target if target['image_id'] in images]
@@ -83,6 +84,7 @@ class VQADataset(Dataset):
             print('ERROR [!] : exception in __getitem__')
 
 
+# TODO can we make use of any of the following functions?
 # class MyDataset(Dataset):
 #     def __init__(self, image_paths, target_paths, train=True):
 #         self.image_paths = image_paths
@@ -130,8 +132,8 @@ if __name__ == '__main__':
                                    questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                    images_path='data/images',
                                    phase='train')
-    train_dataloader = torch.utils.data.DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
-                                                   collate_fn=lambda x: x)
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
+                                  collate_fn=lambda x: x)
     for i_batch, batch in enumerate(train_dataloader):
         print(i_batch, batch)
 
@@ -139,6 +141,6 @@ if __name__ == '__main__':
                                  questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
                                  images_path='data/images',
                                  phase='val')
-    val_dataloader = torch.utils.data.DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
     for i_batch, batch in enumerate(val_dataloader):
         print(i_batch, batch)
