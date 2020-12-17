@@ -59,6 +59,11 @@ class my_LSTM(nn.Module):
         self.encoder = nn.LSTM(input_size=input_dim, hidden_size=hidden_dim, num_layers=BiLSTM_layers, batch_first=True)
 
     def forward(self, sample):  # this is required function. can't change its name
+        question = sample.split(' ')
+        question_indexes = [word_idx_mappings[i] if i in word_idx_mappings.keys() else
+                            word_idx_mappings['<unk>'] for i in question]
+        question_embeddings = torch.stack([word_vectors[i] for i in question_indexes], dim=0)
+        questions_output = lstm(question_embeddings[None, ...])
         lstm_out, _ = self.encoder(sample)
         return lstm_out[0][-1]  # return only last hidden state, of the last layer of LSTM
 
@@ -70,32 +75,31 @@ if __name__ == "__main__":
     dropout_layers_probability = 0.0  # nn.LSTM default
 
     ### Build word dict and init word embeddings ###
-    train_dataloader, val_dataloader = dataset.get_data_loaders()
-    train_questions_batch = []
-    for i_batch, sample_batched in enumerate(train_dataloader):
-        for sample in sample_batched:
-            train_questions_batch.append(sample['question'].split(' '))
-    train_word_dict = get_vocabs_counts_list_of_words(train_questions_batch)
+    train_word_dict = get_vocabs_counts(['data/v2_OpenEnded_mscoco_train2014_questions.json'])
 
     vocab = Vocab(Counter(train_word_dict), vectors=None, min_freq=1)
     # set rand vectors and get the weights (the vector embeddings themselves)
     words_embeddings_tensor = nn.Embedding(len(vocab.stoi), word_embd_dim).weight.data
     vocab.set_vectors(stoi=vocab.stoi, vectors=words_embeddings_tensor, dim=word_embd_dim)
     word_idx_mappings, idx_word_mappings, word_vectors = vocab.stoi, vocab.itos, vocab.vectors
-    # print(word_vectors.shape)
-    print(word_idx_mappings)
 
     ### new sample into lstm model ###
     lstm = my_LSTM(word_embd_dim, hidden_dim, BiLSTM_layers)
     # one sample
+    from dataset import VQADataset
+
+    vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
+                                   questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
+                                   images_path='data/images',
+                                   phase='train')
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
+
     for i_batch, batch in enumerate(train_dataloader):
         for i_sample, sample in enumerate(batch):
             """processing for a single image"""
-            question = batch[i_sample]['question'].split(' ')
-            question_indexes = [word_idx_mappings[i] if i in word_idx_mappings.keys() else
-                                word_idx_mappings['<unk>'] for i in question]
-            question_embeddings = torch.stack([word_vectors[i] for i in question_indexes], dim=0)
-            questions_output = lstm(question_embeddings[None, ...])
+
+
+            questions_output = lstm(batch[i_sample]['question'])
 
             print(questions_output.shape)
     # one batch
