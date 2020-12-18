@@ -100,7 +100,7 @@ if __name__ == '__main__':
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+    optimizer = optim.Adam(model.parameters(), lr=0.01)
 
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
@@ -139,7 +139,35 @@ if __name__ == '__main__':
         print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
+        with torch.no_grad():
+            accuracy = 0
+            for i_batch, batch in enumerate(val_dataloader):
+                # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
+                images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
+
+                # questions
+                questions_batch_ = [sample['question'] for sample in batch]  # Natural language e.g. 'How many dogs?'
+
+                # answers
+                answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
+                target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
+
+                output = model(images_batch_, questions_batch_)
+
+                pred = torch.argmax(output, dim=1)
+                scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
+                          for sample in batch]
+
+                for i, prediction in enumerate(pred):
+                    sample_score = scores[i]
+                    if int(prediction) in sample_score:
+                        accuracy += sample_score[int(prediction)]
+
+            val_acc = accuracy / len(vqa_val_dataset)
+            print(f'Validation accuracy = {round(val_acc, 5)}')
+
 # TODO:
-#  2. add evaluate on validation set
-#  3. choose a cnn with less params
-#  4. early stopping, reduce lr on plateau
+#  1. choose a cnn with less params ??
+#   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
+#  2. early stopping, reduce lr on plateau
+#  3. smaller words vocabulary in LSTM ??
