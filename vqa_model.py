@@ -131,3 +131,5 @@ if __name__ == '__main__':
 # TODO:
 #  1. insert lstm back to forward
 #  2. add evaluate on validation set
+#  3. choose a cnn with less params
+#  4. early stopping, reduce lr on plateau
