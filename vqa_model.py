@@ -89,7 +89,7 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    batch_size = 16
+    batch_size = 32
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
 
@@ -105,6 +105,9 @@ if __name__ == '__main__':
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
     print(f'============ # Parameters: {n_params}============')
+
+    print(f'Device: {model.device}')
+
     epochs = 50
     for epoch in range(epochs):
         epoch_losses = list()
@@ -130,8 +133,8 @@ if __name__ == '__main__':
             optimizer.step()
 
             if i_batch % int(1000 / batch_size) == 0:
-                print(f'processed {i_batch * batch_size} questions out of {len(vqa_train_dataset)} total in '
-                      f'{int(time.time() - timer_images)} secs')
+                print(f'processed {int(1000 / batch_size) * batch_size} questions out of {len(vqa_train_dataset)} total'
+                      f'in {int(time.time() - timer_images)} secs')
                 timer_images = time.time()
         print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
