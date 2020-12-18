@@ -29,6 +29,7 @@ Adopted from: https://github.com/Cadene/pretrained-models.pytorch/blob/master/pr
 # from __future__ import print_function, division, absolute_import
 import math
 import torch
+import platform
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -107,6 +108,10 @@ class Xception(nn.Module):
 
     def __init__(self):
         super(Xception, self).__init__()
+
+        running_on_linux = 'Linux' in platform.platform()
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.conv1 = nn.Conv2d(3, 32, 3, 2, 0, bias=False)
         self.bn1 = nn.BatchNorm2d(32)

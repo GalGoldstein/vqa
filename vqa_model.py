@@ -17,17 +17,16 @@ import time
 class VQA(nn.Module):
     def __init__(self, lstm_params, label2ans_path, fc_size=2048):
         super(VQA, self).__init__()
+        running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.cnn = cnn.Xception().to(self.device)
-        self.cnn.device = self.device
 
         self.lstm = lstm.LSTM(lstm_params['word_embd_dim'],
                               lstm_params['lstm_hidden_dim'],
                               lstm_params['n_layers'],
                               lstm_params['train_question_path']).to(self.device)
-        self.lstm.device = self.device
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
@@ -44,8 +43,11 @@ class VQA(nn.Module):
 
         return torch.tensor(all_answers)
 
-    def forward(self, images_batch, questions_representation):
+    def forward(self, images_batch, questions_batch):
         images_representation = self.cnn(images_batch)
+        questions_last_hidden = [self.lstm(self.lstm.words_to_idx(question)) for question in questions_batch]
+        questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
+
         pointwise_mul = torch.mul(images_representation, questions_representation)
 
         return self.fc(pointwise_mul)
@@ -108,19 +110,17 @@ if __name__ == '__main__':
         for i_batch, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
 
-            # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
+            # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
 
             # questions
-            questions_batch_ = [sample['question'] for sample in batch]
-            questions = [model.lstm(model.lstm.words_to_idx(question)) for question in questions_batch_]
-            questions_represents = torch.stack(questions, dim=0).to(model.device)
+            questions_batch_ = [sample['question'] for sample in batch]  # Natural language e.g. 'How many dogs?'
 
             # answers
             answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
             target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
-            output = model(images_batch_, questions_represents)
+            output = model(images_batch_, questions_batch_)
             loss = criterion(output, target)
             loss.backward()
             epoch_losses.append(loss.item())
@@ -129,7 +129,6 @@ if __name__ == '__main__':
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
 # TODO:
-#  1. insert lstm back to forward
 #  2. add evaluate on validation set
 #  3. choose a cnn with less params
 #  4. early stopping, reduce lr on plateau

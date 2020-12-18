@@ -3,6 +3,7 @@ from collections import Counter
 from collections import defaultdict
 import torch
 import torch.nn as nn
+import platform
 import re
 import json
 
@@ -10,6 +11,11 @@ import json
 class LSTM(nn.Module):
     def __init__(self, word_embd_dim, lstm_hidden_dim, n_layers, train_question_path):
         super(LSTM, self).__init__()
+
+        running_on_linux = 'Linux' in platform.platform()
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+
         self.train_question_path = train_question_path
 
         # Build word dict and init word embeddings #
@@ -47,16 +53,16 @@ class LSTM(nn.Module):
 
     def words_to_idx(self, sentence: str):
         question = sentence.split(' ')
-        question_word_idx_tensor = torch.tensor([self.word_idx_mappings[i] if i in self.word_idx_mappings else
-                                                 self.word_idx_mappings['<unk>'] for i in question])
+        question_word_idx_tensor = torch.tensor([self.word_idx_mappings[word] if word in self.word_idx_mappings else
+                                                 self.word_idx_mappings['<unk>'] for word in question])
         return question_word_idx_tensor.to(self.device)
 
     def forward(self, word_idx_tensor):
         word_embeddings = self.word_embedding(word_idx_tensor)
-        output, _ = self.encoder(word_embeddings[None, ...])  # TODO currently supporting only a single sentence
+        output, _ = self.encoder(word_embeddings[None, ...])  # currently supporting only a single sentence
         return output[0][-1]  # return only last hidden state, of the last layer of LSTM
 
 
 if __name__ == "__main__":
     lstm = LSTM(100, 1024, 2, 'data/v2_OpenEnded_mscoco_train2014_questions.json')
-    out = lstm('Where is he looking?')
+    out = lstm(lstm.words_to_idx('Where is he looking?'))
