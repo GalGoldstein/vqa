@@ -133,8 +133,8 @@ if __name__ == '__main__':
             optimizer.step()
 
             if i_batch % int(1000 / batch_size) == 0:
-                print(f'processed {int(1000 / batch_size) * batch_size} questions out of {len(vqa_train_dataset)} total'
-                      f'in {int(time.time() - timer_images)} secs')
+                print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_images)} '
+                      f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_images = time.time()
         print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
