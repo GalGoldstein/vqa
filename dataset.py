@@ -76,7 +76,7 @@ class VQADataset(Dataset):
             # TODO - set parameter for resize in args
             #  what is the size we want?
             # Resize
-            resize = transforms.Resize(size=(299, 299))
+            resize = transforms.Resize(size=(224, 224))
             image = resize(image)
 
             # this also divides by 255 TODO we can normalize too

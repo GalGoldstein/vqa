@@ -15,13 +15,14 @@ import time
 
 
 class VQA(nn.Module):
-    def __init__(self, lstm_params, label2ans_path, fc_size=2048):
+    def __init__(self, lstm_params, label2ans_path, fc_size):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        self.cnn = cnn.Xception().to(self.device)
+        # self.cnn = cnn.Xception().to(self.device)
+        self.cnn = cnn.MobileNetV2().to(self.device)
 
         self.lstm = lstm.LSTM(lstm_params['word_embd_dim'],
                               lstm_params['lstm_hidden_dim'],
@@ -54,7 +55,7 @@ class VQA(nn.Module):
 
 
 if __name__ == '__main__':
-    compute_targets()
+    # compute_targets()
 
     running_on_linux = 'Linux' in platform.platform()
 
@@ -88,13 +89,14 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
+    batch_size = 16
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
 
-    lstm_params_ = {'word_embd_dim': 100, 'lstm_hidden_dim': 2048, 'n_layers': 1,
+    lstm_params_ = {'word_embd_dim': 100, 'lstm_hidden_dim': 1280, 'n_layers': 1,
                     'train_question_path': train_questions_json_path}
 
-    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_)
+    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, fc_size=1280)
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss()
@@ -107,6 +109,7 @@ if __name__ == '__main__':
     for epoch in range(epochs):
         epoch_losses = list()
         epoch_start_time = time.time()
+        timer_images = time.time()
         for i_batch, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
 
@@ -125,6 +128,11 @@ if __name__ == '__main__':
             loss.backward()
             epoch_losses.append(loss.item())
             optimizer.step()
+
+            if i_batch % int(1000 / batch_size) == 0:
+                print(f'processed {i_batch * batch_size} questions out of {len(vqa_train_dataset)} total in '
+                      f'{int(time.time() - timer_images)} secs')
+                timer_images = time.time()
         print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 

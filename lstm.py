@@ -66,3 +66,7 @@ class LSTM(nn.Module):
 if __name__ == "__main__":
     lstm = LSTM(100, 1024, 2, 'data/v2_OpenEnded_mscoco_train2014_questions.json')
     out = lstm(lstm.words_to_idx('Where is he looking?'))
+
+    n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(lstm.parameters())])
+    print(f'============ # Parameters: {n_params}============')
+

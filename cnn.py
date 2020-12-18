@@ -1,32 +1,14 @@
 """
-Ported to pytorch thanks to [tstandley](https://github.com/tstandley/Xception-PyTorch)
-
-@author: tstandley
-Adapted by cadene
-
-Creates an Xception Model as defined in:
-
-Francois Chollet
-Xception: Deep Learning with Depthwise Separable Convolutions
-https://arxiv.org/pdf/1610.02357.pdf
-
-This weights ported from the Keras implementation. Achieves the following performance on the validation set:
-
-Loss:0.9173 Prec@1:78.892 Prec@5:94.292
-
-REMEMBER to set your image size to 3x299x299 for both test and validation
-
-normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
-                                  std=[0.5, 0.5, 0.5])
-
-The resize parameter of the validation transform should be 333, and make sure to center crop at 299x299
-
-
-
-Adopted from: https://github.com/Cadene/pretrained-models.pytorch/blob/master/pretrainedmodels/models/xception.py
+CNNs
 """
 
-# from __future__ import print_function, division, absolute_import
+"""
+
+Xception
+https://github.com/Cadene/pretrained-models.pytorch/blob/master/pretrainedmodels/models/xception.py
+
+"""
+
 import math
 import torch
 import platform
@@ -195,6 +177,177 @@ class Xception(nn.Module):
         return x
 
 
+"""
+
+MobileNet V2
+
+"""
+
+
+def conv_bn(inp, oup, stride):
+    return nn.Sequential(
+        nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
+        nn.BatchNorm2d(oup),
+        nn.ReLU6(inplace=True)
+    )
+
+
+def conv_1x1_bn(inp, oup):
+    return nn.Sequential(
+        nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
+        nn.BatchNorm2d(oup),
+        nn.ReLU6(inplace=True)
+    )
+
+
+def make_divisible(x, divisible_by=8):
+    import numpy as np
+    return int(np.ceil(x * 1. / divisible_by) * divisible_by)
+
+
+class InvertedResidual(nn.Module):
+    def __init__(self, inp, oup, stride, expand_ratio):
+        super(InvertedResidual, self).__init__()
+        self.stride = stride
+        assert stride in [1, 2]
+
+        hidden_dim = int(inp * expand_ratio)
+        self.use_res_connect = self.stride == 1 and inp == oup
+
+        if expand_ratio == 1:
+            self.conv = nn.Sequential(
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU6(inplace=True),
+                # pw-linear
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(oup),
+            )
+        else:
+            self.conv = nn.Sequential(
+                # pw
+                nn.Conv2d(inp, hidden_dim, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU6(inplace=True),
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+                nn.BatchNorm2d(hidden_dim),
+                nn.ReLU6(inplace=True),
+                # pw-linear
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                nn.BatchNorm2d(oup),
+            )
+
+    def forward(self, x):
+        if self.use_res_connect:
+            return x + self.conv(x)
+        else:
+            return self.conv(x)
+
+
+class MobileNetV2(nn.Module):
+    def __init__(self, input_size=224, width_mult=1.):
+        super(MobileNetV2, self).__init__()
+
+        running_on_linux = 'Linux' in platform.platform()
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+
+        block = InvertedResidual
+        input_channel = 32
+        last_channel = 1280
+        interverted_residual_setting = [
+            # t, c, n, s
+            [1, 16, 1, 1],
+            [6, 24, 2, 2],
+            [6, 32, 3, 2],
+            [6, 64, 4, 2],
+            [6, 96, 3, 1],
+            [6, 160, 3, 2],
+            [6, 320, 1, 1],
+        ]
+
+        # building first layer
+        assert input_size % 32 == 0
+        # input_channel = make_divisible(input_channel * width_mult)  # first channel is always 32!
+        self.last_channel = make_divisible(last_channel * width_mult) if width_mult > 1.0 else last_channel
+        self.features = [conv_bn(3, input_channel, 2)]
+        # building inverted residual blocks
+        for t, c, n, s in interverted_residual_setting:
+            output_channel = make_divisible(c * width_mult) if t > 1 else c
+            for i in range(n):
+                if i == 0:
+                    self.features.append(block(input_channel, output_channel, s, expand_ratio=t))
+                else:
+                    self.features.append(block(input_channel, output_channel, 1, expand_ratio=t))
+                input_channel = output_channel
+        # building last several layers
+        self.features.append(conv_1x1_bn(input_channel, self.last_channel))
+        # make it nn.Sequential
+        self.features = nn.Sequential(*self.features)
+
+        # building classifier
+        # self.classifier = nn.Linear(self.last_channel, n_class)
+
+        self._initialize_weights()
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.mean(3).mean(2)
+        # x = self.classifier(x)
+        return x
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, math.sqrt(2. / n))
+                if m.bias is not None:
+                    m.bias.data.zero_()
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
+            elif isinstance(m, nn.Linear):
+                n = m.weight.size(1)
+                m.weight.data.normal_(0, 0.01)
+                m.bias.data.zero_()
+
+
+"""
+
+Just a Simple CNN
+https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
+
+"""
+
+# class SimpleCNN(nn.Module):
+#     def __init__(self):
+#         super(SimpleCNN, self).__init__()
+#
+#         running_on_linux = 'Linux' in platform.platform()
+#         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+#         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+#
+#         self.conv1 = nn.Conv2d(3, 6, 5)
+#         self.pool = nn.MaxPool2d(2, 2)
+#         self.conv2 = nn.Conv2d(6, 16, 5)
+#         self.fc1 = nn.Linear(16 * 5 * 5, 120)
+#         self.fc2 = nn.Linear(120, 84)
+#         self.fc3 = nn.Linear(84, 10)
+#
+#     def forward(self, x):
+#         x = self.pool(F.relu(self.conv1(x)))
+#         x = self.pool(F.relu(self.conv2(x)))
+#         x = x.view(-1, 16 * 5 * 5)
+#         x = F.relu(self.fc1(x))
+#         x = F.relu(self.fc2(x))
+#         x = self.fc3(x)
+#         return x
+
+
+# net = SimpleCNN()
+
 if __name__ == "__main__":
     from dataset import VQADataset
 
@@ -205,17 +358,25 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
 
     xception = Xception()
+    mobilenetv2 = MobileNetV2()
+
+    n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(xception.parameters())])
+    print(f'============ # Xception parameters: {n_params}============')
+    n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(mobilenetv2.parameters())])
+    print(f'============ # MobileNetV2 parameters: {n_params}============')
 
     for i_batch, batch in enumerate(train_dataloader):
         """processing for a single image"""
         image = batch[0]['image']
-        single_image_output = xception(image[None, ...])
+        single_image_output1 = xception(image[None, ...])
+        single_image_output2 = mobilenetv2(image[None, ...])
 
         """processing for a batch"""
         # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
         images_batch = torch.stack([sample['image'] for sample in batch], dim=0)
-        batch_image_output = xception(images_batch)
+        batch_image_output1 = xception(images_batch)
+        batch_image_output2 = mobilenetv2(images_batch)
 
         # print(i_batch, batch)
-        # breakpoint()
+        breakpoint()
         break
