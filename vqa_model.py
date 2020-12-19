@@ -153,7 +153,7 @@ if __name__ == '__main__':
     print(f'============ # Parameters: {n_params}============')
     print(f'Device: {model.device}')
 
-    print(f'batch_size = {batch_size}'
+    print(f'batch_size = {batch_size}\n'
           f'word_embd_dim = {word_embd_dim}\n'
           f'lstm_hidden_dim = {lstm_hidden_dim}\n'
           f'LSTM_layers = {LSTM_layers}\n'
