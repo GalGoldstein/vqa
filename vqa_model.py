@@ -153,7 +153,7 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    batch_size = 64
+    batch_size = 32
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=lambda x: x)
 
