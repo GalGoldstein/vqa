@@ -68,7 +68,7 @@ class LSTM(nn.Module):
         question = sentence.split(' ')
         question_word_idx_tensor = torch.tensor([self.word_idx_mappings[word] if word in self.word_idx_mappings else
                                                  self.word_idx_mappings['<unk>'] for word in question])
-        return question_word_idx_tensor
+        return question_word_idx_tensor.to(self.device)
 
     def forward(self, word_idx_tensor):
         word_embeddings = self.word_embedding(word_idx_tensor)
