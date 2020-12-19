@@ -70,7 +70,7 @@ def soft_scores_target(batch, n_classes):
     return idx_questions_without_answers, torch.stack(targets, dim=0)
 
 
-def evaluate(dataLoader, model, criterion, last_epoch_loss):
+def evaluate(dataLoader, model, criterion, last_epoch_loss, vqa_val_dataset):
     with torch.no_grad():
         accuracy = 0
         val_epoch_losses = list()
@@ -95,7 +95,7 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss):
             output_ev = model(images_batch__ev, questions_batch__ev)
 
             loss_ev = criterion(output_ev, target_ev)
-            val_epoch_losses.append(loss_ev.item())
+            val_epoch_losses.append(float(loss_ev))
 
             pred = torch.argmax(output_ev, dim=1)
             scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
@@ -127,11 +127,13 @@ def main():
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/datashare',
+                                       force_read=True,
                                        phase='train')
 
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/datashare',
+                                     force_read=True,
                                      phase='val')
 
         train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'
@@ -142,13 +144,14 @@ def main():
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='data/images',
+                                       force_read=True,
                                        phase='train')
 
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='data/images',
+                                     force_read=True,
                                      phase='val')
-
         train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
@@ -184,7 +187,7 @@ def main():
           f'initial_lr = {initial_lr}\n')
 
     last_epoch_loss = np.inf
-    epochs = 1
+    epochs = 10
     for epoch in range(epochs):
         train_epoch_losses = list()
         epoch_start_time = time.time()
@@ -211,11 +214,11 @@ def main():
             output = model(images_batch_, questions_batch_)
             loss = criterion(output, target)
             loss.backward()
-            train_epoch_losses.append(loss.item())
+            train_epoch_losses.append(float(loss))
             optimizer.step()
 
-            if i_batch * batch_size > 10000:
-                exit(777)
+            # if i_batch * batch_size > 10000:
+            #     exit(777)
 
             if i_batch and i_batch % int(1000 / batch_size) == 0:
                 print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_images)} '
@@ -224,7 +227,7 @@ def main():
 
             if i_batch and i_batch == int(len(train_dataloader) / 2):
                 # evaluate in the middle of epoch, if no improvement in val loss, reduce lr (lr = lr / 2)
-                _, reduce_lr, _ = evaluate(val_dataloader, model, criterion, last_epoch_loss)
+                _, reduce_lr, _ = evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
                 if reduce_lr:
                     print("========================== Reduce Learning Rate ==========================")
                     print(f"learning rate: {optimizer.param_groups[0]['lr']} >> {optimizer.param_groups[0]['lr'] / 2}")
@@ -233,7 +236,8 @@ def main():
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
-        cur_epoch_loss, earlystopping, val_acc = evaluate(val_dataloader, model, criterion, last_epoch_loss)
+        cur_epoch_loss, earlystopping, val_acc = \
+            evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
         last_epoch_loss = cur_epoch_loss
         if earlystopping:
             print(f"========================== Earlystopping epoch = {epoch + 1} ==========================")
@@ -254,12 +258,12 @@ def main():
 # nohup python -u vqa_model.py > 1.out&
 
 if __name__ == '__main__':
-    import cProfile
-
-    PROFFILE = 'prof.profile'
-    cProfile.run('main()', PROFFILE)
-    import pstats
-
-    p = pstats.Stats(PROFFILE)
-    p.sort_stats('tottime').print_stats(250)
-    # main()
+    # import cProfile
+    #
+    # PROFFILE = 'prof.profile'
+    # cProfile.run('main()', PROFFILE)
+    # import pstats
+    #
+    # p = pstats.Stats(PROFFILE)
+    # p.sort_stats('tottime').print_stats(250)
+    main()

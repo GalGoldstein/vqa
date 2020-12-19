@@ -12,6 +12,7 @@ from torchvision import transforms
 import random
 import torchvision.transforms.functional as TF
 import lstm
+import sys
 
 
 class VQADataset(Dataset):
@@ -21,7 +22,8 @@ class VQADataset(Dataset):
 
     """Visual Question Answering v2 dataset."""
 
-    def __init__(self, target_pickle_path: str, questions_json_path: str, images_path: str, phase: str):
+    def __init__(self, target_pickle_path: str, questions_json_path: str, images_path: str, phase: str,
+                 force_read: bool):
         """
         parameters:
             target_pickle_path: (str) path to pickle file produced with compute_softscore.py
@@ -30,6 +32,7 @@ class VQADataset(Dataset):
                 e.g. 'v2_OpenEnded_mscoco_val2014_questions.json'
             images_path: (str) path to dir containing 'train2014' and 'val2014' folders
             phase: (str) 'train' / 'val'
+            force_read: (bool) if True loads all images to RAM. False reads image only by request (call to __getitem__)
         """
         self.target = pickle.load(open(target_pickle_path, "rb"))
         self.questions = json.load(open(questions_json_path))['questions']
@@ -37,6 +40,7 @@ class VQADataset(Dataset):
             question['question'] = ' '.join(lstm.LSTM.preprocess_question_string(question['question']))
         self.img_path = images_path
         self.phase = phase
+        self.force_read = force_read
 
         # TODO delete next 3 lines: only for verifying everything works (verify image in path)
         running_on_linux = 'Linux' in platform.platform()
@@ -45,11 +49,12 @@ class VQADataset(Dataset):
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
 
-        self.images_tensors = dict()
-        self.read_images()
+        if self.force_read:
+            self.images_tensors = dict()
+            self.read_images()
 
     def read_images(self):
-        image_ids = set([q['image_id'] for q in self.questions])
+        image_ids = list(set([q['image_id'] for q in self.questions]))[:1000]  # TODO
         for image_id in image_ids:
             # full path to image
             # the image .jpg path contains 12 chars for image id
@@ -88,7 +93,26 @@ class VQADataset(Dataset):
         question_string = question_dict['question']
         # e.g. question_string = 'Where is he looking?'
 
-        image_tensor = self.images_tensors[question_dict['image_id']]
+        if self.force_read:  # upload all to RAM
+            image_tensor = self.images_tensors[question_dict['image_id']]
+
+        else:
+            # the image .jpg path contains 12 chars for image id
+            image_id = str(question_dict['image_id']).zfill(12)
+
+            # full path to image
+            image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.jpg')
+
+            image = Image.open(image_path).convert('RGB')
+
+            # TODO - set parameter for resize in args
+            #  what is the size we want?
+            # Resize
+            resize = transforms.Resize(size=(224, 224))
+            image = resize(image)
+
+            # this also divides by 255 TODO we can normalize too
+            image_tensor = TF.to_tensor(image)
 
         return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
 
@@ -140,9 +164,12 @@ if __name__ == '__main__':
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                    images_path='data/images',
+                                   force_read=True,
                                    phase='train')
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                   collate_fn=lambda x: x)
+    print(f'sizeof self.images_tensors 1k images: {sys.getsizeof(vqa_train_dataset.images_tensors)}')
+    exit(777)  # TODO
     for i_batch, batch in enumerate(train_dataloader):
         print(i_batch, batch)
         break
@@ -150,6 +177,7 @@ if __name__ == '__main__':
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
                                  images_path='data/images',
+                                 force_read=True,
                                  phase='val')
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
     for i_batch, batch in enumerate(val_dataloader):

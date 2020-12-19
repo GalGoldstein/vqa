@@ -354,6 +354,7 @@ if __name__ == "__main__":
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                    images_path='data/images',
+                                   force_read=False,
                                    phase='train')
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
 
