@@ -214,7 +214,7 @@ def main():
             train_epoch_losses.append(loss.item())
             optimizer.step()
 
-            if i_batch > 15:
+            if i_batch * batch_size > 10000:
                 exit(777)
 
             if i_batch and i_batch % int(1000 / batch_size) == 0:
@@ -248,6 +248,9 @@ def main():
 #  1. choose a cnn with less params ??
 #   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
 #  2. BCELoss with Sigmoid and soft_scores_target()
+#  3. Improve data read process -
+#   - Word to index and target - create them in Dataset
+#   - Upload all images resized to RAM (upload each image once)
 # nohup python -u vqa_model.py > 1.out&
 
 if __name__ == '__main__':
@@ -259,3 +262,4 @@ if __name__ == '__main__':
 
     p = pstats.Stats(PROFFILE)
     p.sort_stats('tottime').print_stats(250)
+    # main()
