@@ -128,11 +128,8 @@ def main():
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/datashare',
-                                       force_read=False,
+                                       force_read=True,
                                        phase='train')
-        # print(f'sizeof self.images_tensors {len(vqa_train_dataset.images_tensors)} images: '
-        #       f'{sys.getsizeof(vqa_train_dataset.images_tensors)}')
-        # exit(777)  # TODO
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/datashare',
@@ -162,6 +159,7 @@ def main():
     batch_size = 64
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=lambda x: x)
+    # TODO try val with force=False, num_workers=4
 
     word_embd_dim = 100
     lstm_hidden_dim = 1280
