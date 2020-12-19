@@ -45,6 +45,27 @@ class VQADataset(Dataset):
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
 
+        self.images_tensors = dict()
+        self.read_images()
+
+    def read_images(self):
+        image_ids = set([q['image_id'] for q in self.questions])
+        for image_id in image_ids:
+            # full path to image
+            # the image .jpg path contains 12 chars for image id
+            image_id = str(image_id).zfill(12)
+            image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.jpg')
+            image = Image.open(image_path).convert('RGB')
+
+            # TODO - set parameter for resize in args
+            #  what is the size we want?
+            # Resize
+            resize = transforms.Resize(size=(224, 224))
+            image = resize(image)
+
+            # this also divides by 255 TODO we can normalize too
+            self.images_tensors[int(image_id)] = TF.to_tensor(image)
+
     def __len__(self):
         return len(self.target)
 
@@ -67,27 +88,9 @@ class VQADataset(Dataset):
         question_string = question_dict['question']
         # e.g. question_string = 'Where is he looking?'
 
-        # the image .jpg path contains 12 chars for image id
-        image_id = str(question_dict['image_id']).zfill(12)
+        image_tensor = self.images_tensors[question_dict['image_id']]
 
-        # full path to image
-        image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.jpg')
-
-        try:
-            image = Image.open(image_path).convert('RGB')
-
-            # TODO - set parameter for resize in args
-            #  what is the size we want?
-            # Resize
-            resize = transforms.Resize(size=(224, 224))
-            image = resize(image)
-
-            # this also divides by 255 TODO we can normalize too
-            image_tensor = TF.to_tensor(image)
-            return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
-
-        except:
-            print('ERROR [!] : exception in __getitem__')
+        return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
 
 
 # TODO can we make use of any of the following functions?
@@ -142,6 +145,7 @@ if __name__ == '__main__':
                                   collate_fn=lambda x: x)
     for i_batch, batch in enumerate(train_dataloader):
         print(i_batch, batch)
+        break
 
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
@@ -150,3 +154,4 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
     for i_batch, batch in enumerate(val_dataloader):
         print(i_batch, batch)
+        break
