@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from PIL import Image
 from torchvision import transforms
 import random
+import time
 import torchvision.transforms.functional as TF
 import lstm
 import sys
@@ -52,9 +53,11 @@ class VQADataset(Dataset):
         if self.force_read:
             self.images_tensors = dict()
             self.read_images()
+            print(f'finished_reading 1000 images')
+            time.sleep(1000)
 
     def read_images(self):
-        image_ids = set([question['image_id'] for question in self.questions])
+        image_ids = list(set([question['image_id'] for question in self.questions]))[:1000]  # TODO delete
         for image_id in image_ids:
             # full path to image
             # the image .jpg path contains 12 chars for image id
