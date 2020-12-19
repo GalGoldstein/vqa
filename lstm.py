@@ -34,6 +34,19 @@ class LSTM(nn.Module):
         self.encoder = nn.LSTM(input_size=word_embd_dim, hidden_size=lstm_hidden_dim, num_layers=n_layers,
                                batch_first=True)
 
+    @staticmethod
+    def preprocess_question_string(question):
+        """
+            1. only numbers and letters
+            2. lower all except first word first letter
+            3. any word with number >> <number>
+        """
+        result = question[0].upper() + question[1:].lower()
+        words = result.split(' ')
+        result = [('<number>' if any(char.isdigit() for char in word) else re.sub(r'[\W_]+', '', word))
+                  for word in words]
+        return result
+
     def get_vocabs_counts(self):
         """
             creates dictionary with number of appearances (counts) of each word
@@ -43,7 +56,7 @@ class LSTM(nn.Module):
         with open(self.train_question_path) as json_file:
             data = json.load(json_file)
             for q_object in data['questions']:
-                words = re.split(' ', q_object['question'])
+                words = self.preprocess_question_string(q_object['question'])
                 for word in words:
                     if word in word_dict.keys():
                         word_dict[word] += 1
@@ -69,4 +82,3 @@ if __name__ == "__main__":
 
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(lstm.parameters())])
     print(f'============ # Parameters: {n_params}============')
-

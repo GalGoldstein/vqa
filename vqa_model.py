@@ -193,7 +193,7 @@ if __name__ == '__main__':
                     print(f"{optimizer.param_groups[0]['lr']} >>>> {optimizer.param_groups[0]['lr'] / 2}")
                     optimizer.param_groups[0]['lr'] /= 2
 
-        print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(train_epoch_losses)), 4)}")
+        print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
         cur_epoch_loss, earlystopping = evaluate(val_dataloader, model, criterion, last_epoch_loss)
@@ -205,4 +205,3 @@ if __name__ == '__main__':
 # TODO:
 #  1. choose a cnn with less params ??
 #   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
-#  2. smaller words vocabulary in LSTM ??
