@@ -35,6 +35,10 @@ class VQADataset(Dataset):
         self.img_path = images_path
         self.phase = phase
 
+        running_on_linux = 'Linux' in platform.platform()
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+
         # TODO delete next 3 lines: only for verifying everything works (verify image in path)
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:
@@ -81,7 +85,7 @@ class VQADataset(Dataset):
 
             # this also divides by 255 TODO we can normalize too
             image_tensor = TF.to_tensor(image)
-            return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
+            return {'image': image_tensor.to(self.device), 'question': question_string, 'answer': answer_dict}
 
         except:
             print('ERROR [!] : exception in __getitem__')
