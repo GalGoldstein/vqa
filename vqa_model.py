@@ -1,5 +1,6 @@
 import math
 import torch
+import sys
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -129,7 +130,9 @@ def main():
                                        images_path='/datashare',
                                        force_read=True,
                                        phase='train')
-
+        print(f'sizeof self.images_tensors {len(vqa_train_dataset.images_tensors)} images: '
+              f'{sys.getsizeof(vqa_train_dataset.images_tensors)}')
+        exit(777)  # TODO
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/datashare',
