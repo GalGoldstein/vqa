@@ -45,9 +45,9 @@ class VQA(nn.Module):
         return torch.tensor(all_answers)
 
     def forward(self, images_batch, questions_batch):
-        images_representation = self.cnn(images_batch)
+        images_representation = self.cnn(images_batch).to(self.device)
         questions_last_hidden = [self.lstm(self.lstm.words_to_idx(question)) for question in questions_batch]
-        questions_representation = torch.stack(questions_last_hidden, dim=0)
+        questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
         pointwise_mul = torch.mul(images_representation, questions_representation)
 
