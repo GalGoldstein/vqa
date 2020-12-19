@@ -168,7 +168,8 @@ if __name__ == '__main__':
                                    phase='train')
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                   collate_fn=lambda x: x)
-    print(f'sizeof self.images_tensors 1k images: {sys.getsizeof(vqa_train_dataset.images_tensors)}')
+    print(f'sizeof self.images_tensors {len(vqa_train_dataset.images_tensors)} images: '
+          f'{sys.getsizeof(vqa_train_dataset.images_tensors)}')
     exit(777)  # TODO
     for i_batch, batch in enumerate(train_dataloader):
         print(i_batch, batch)
