@@ -128,7 +128,7 @@ def main():
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/datashare',
-                                       force_read=True,
+                                       force_read=False,
                                        phase='train')
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
@@ -157,9 +157,10 @@ def main():
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     batch_size = 64
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=lambda x: x)
-    # TODO try val with force=False, num_workers=4
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=4,
+                                  collate_fn=lambda x: x)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=4,
+                                collate_fn=lambda x: x)
 
     word_embd_dim = 100
     lstm_hidden_dim = 1280

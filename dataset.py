@@ -70,9 +70,6 @@ class VQADataset(Dataset):
 
             # this also divides by 255 TODO we can normalize too
             self.images_tensors[int(image_id)] = TF.to_tensor(image)
-            # TODO delete
-            if len(self.images_tensors) % 500 == 0:
-                print(f'len {self.phase} self.images_tensors = {len(self.images_tensors)}')
 
     def __len__(self):
         return len(self.target)
