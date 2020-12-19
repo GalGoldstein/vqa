@@ -45,7 +45,7 @@ class VQA(nn.Module):
         return torch.tensor(all_answers)
 
     def forward(self, images_batch, questions_batch):
-        images_representation = self.cnn(images_batch).to(self.device)
+        images_representation = self.cnn(images_batch)
         questions_last_hidden = [self.lstm(self.lstm.words_to_idx(question)) for question in questions_batch]
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
@@ -77,7 +77,7 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss):
         for i_batch_ev, batch_ev in enumerate(dataLoader):
             # answers
             answers_labels_batch__ev = [sample['answer']['label_counts'] for sample in batch_ev]
-            target_ev = model.answers_to_one_hot(answers_labels_batch__ev)
+            target_ev = model.answers_to_one_hot(answers_labels_batch__ev).to(model.device)
 
             # don't learn from questions without answers
             idx_questions_without_answers_ev = torch.nonzero(target_ev == model.num_classes, as_tuple=False)
@@ -85,7 +85,7 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss):
 
             # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch__ev = torch.stack([sample['image'] for idx, sample in enumerate(batch_ev)
-                                            if idx not in idx_questions_without_answers_ev], dim=0)
+                                            if idx not in idx_questions_without_answers_ev], dim=0).to(model.device)
 
             # questions
             # Natural language e.g. questions_batch_ = ['How many dogs?'...]
@@ -153,7 +153,7 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    batch_size = 32
+    batch_size = 64
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=lambda x: x)
 
@@ -193,7 +193,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             # answers
             answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
-            target = model.answers_to_one_hot(answers_labels_batch_)
+            target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
             # don't learn from questions without answers
             idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
@@ -201,7 +201,7 @@ if __name__ == '__main__':
 
             # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch_ = torch.stack([sample['image'] for idx, sample in enumerate(batch)
-                                         if idx not in idx_questions_without_answers], dim=0)
+                                         if idx not in idx_questions_without_answers], dim=0).to(model.device)
 
             # questions
             # Natural language e.g. questions_batch_ = ['How many dogs?'...]

@@ -1,84 +1,151 @@
-from torchtext.vocab import Vocab
-from collections import Counter
-from collections import defaultdict
 import torch
-import torch.nn as nn
-import platform
-import re
+import os
+import io
+import numpy as np
 import json
+import pickle
+import platform
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
+from PIL import Image
+from torchvision import transforms
+import random
+import torchvision.transforms.functional as TF
+import lstm
 
+class VQADataset(Dataset):
+    # TODO hyperparameters:
+    #  1. Resize image
+    #  2. Any kind of augmentation? crop? flip?
 
-class LSTM(nn.Module):
-    def __init__(self, word_embd_dim, lstm_hidden_dim, n_layers, train_question_path):
-        super(LSTM, self).__init__()
+    """Visual Question Answering v2 dataset."""
 
+    def __init__(self, target_pickle_path: str, questions_json_path: str, images_path: str, phase: str):
+        """
+        parameters:
+            target_pickle_path: (str) path to pickle file produced with compute_softscore.py
+                e.g. 'val_target.pkl'
+            train_questions_json_path: (str) path to json with questions
+                e.g. 'v2_OpenEnded_mscoco_val2014_questions.json'
+            images_path: (str) path to dir containing 'train2014' and 'val2014' folders
+            phase: (str) 'train' / 'val'
+        """
+        self.target = pickle.load(open(target_pickle_path, "rb"))
+        self.questions = json.load(open(questions_json_path))['questions']
+        for question in self.questions:
+            question['question'] = ' '.join(lstm.LSTM.preprocess_question_string(question['question']))
+        self.img_path = images_path
+        self.phase = phase
+
+        # TODO delete next 3 lines: only for verifying everything works (verify image in path)
         running_on_linux = 'Linux' in platform.platform()
-        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+        if not running_on_linux:
+            images = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
+            self.target = [target for target in self.target if target['image_id'] in images]
+            self.questions = [question for question in self.questions if question['image_id'] in images]
 
-        self.train_question_path = train_question_path
+    def __len__(self):
+        return len(self.target)
 
-        # Build word dict and init word embeddings #
-        self.word_dict = self.get_vocabs_counts()
-
-        # TODO hyper parameters: min_freq, specials?
-        #  pre-processing of questions words? lower?
-        vocab = Vocab(Counter(self.word_dict), vectors=None, min_freq=1, specials=['<unk>'])
-        # set rand vectors and get the weights (the vector embeddings themselves)
-        words_embeddings_tensor = nn.Embedding(len(vocab.stoi), word_embd_dim).weight.data
-        vocab.set_vectors(stoi=vocab.stoi, vectors=words_embeddings_tensor, dim=word_embd_dim)
-        self.word_idx_mappings, self.idx_word_mappings, word_vectors = vocab.stoi, vocab.itos, vocab.vectors
-
-        self.word_embedding = nn.Embedding.from_pretrained(word_vectors, freeze=False)
-
-        self.encoder = nn.LSTM(input_size=word_embd_dim, hidden_size=lstm_hidden_dim, num_layers=n_layers,
-                               batch_first=True)
-
-    @staticmethod
-    def preprocess_question_string(question):
+    def __getitem__(self, idx):
         """
-            1. only numbers and letters
-            2. lower all except first word first letter
-            3. any word with number >> <number>
+            Return a tuple of 3:
+            (image as tensor, question string, answer)
+
+            References:
+                1. https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
+                2. https://discuss.pytorch.org/t/torchvision-transfors-how-to-perform-identical-transform-on-both-image-and-target/10606/7
         """
-        result = question[0].upper() + question[1:].lower()
-        words = result.split(' ')
-        result = [('<number>' if any(char.isdigit() for char in word) else re.sub(r'[\W_]+', '', word))
-                  for word in words]
-        return result
+        answer_dict = self.target[idx]
+        # e.g. answer_dict =
+        # {'question_id': 262148002, 'question_type': 'what is', 'image_id': 262148, 'label_counts': {79: 3, 11: 1},
+        #  'labels': [79, 11], 'scores': [0.9, 0.3]}
 
-    def get_vocabs_counts(self):
-        """
-            creates dictionary with number of appearances (counts) of each word
-        """
-        word_dict = defaultdict(int)
+        question_dict = self.questions[idx]
+        # e.g. question_dict = {'image_id': 262148, 'question': 'Where is he looking?', 'question_id': 262148000}
+        question_string = question_dict['question']
+        # e.g. question_string = 'Where is he looking?'
 
-        with open(self.train_question_path) as json_file:
-            data = json.load(json_file)
-            for q_object in data['questions']:
-                words = self.preprocess_question_string(q_object['question'])
-                for word in words:
-                    if word in word_dict.keys():
-                        word_dict[word] += 1
-                    else:
-                        word_dict[word] = 1
-        return word_dict
+        # the image .jpg path contains 12 chars for image id
+        image_id = str(question_dict['image_id']).zfill(12)
 
-    def words_to_idx(self, sentence: str):
-        question = sentence.split(' ')
-        question_word_idx_tensor = torch.tensor([self.word_idx_mappings[word] if word in self.word_idx_mappings else
-                                                 self.word_idx_mappings['<unk>'] for word in question])
-        return question_word_idx_tensor.to(self.device)
+        # full path to image
+        image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.jpg')
 
-    def forward(self, word_idx_tensor):
-        word_embeddings = self.word_embedding(word_idx_tensor)
-        output, _ = self.encoder(word_embeddings[None, ...])  # currently supporting only a single sentence
-        return output[0][-1]  # return only last hidden state, of the last layer of LSTM
+        try:
+            image = Image.open(image_path).convert('RGB')
+
+            # TODO - set parameter for resize in args
+            #  what is the size we want?
+            # Resize
+            resize = transforms.Resize(size=(224, 224))
+            image = resize(image)
+
+            # this also divides by 255 TODO we can normalize too
+            image_tensor = TF.to_tensor(image)
+            return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
+
+        except:
+            print('ERROR [!] : exception in __getitem__')
 
 
-if __name__ == "__main__":
-    lstm = LSTM(100, 1024, 2, 'data/v2_OpenEnded_mscoco_train2014_questions.json')
-    out = lstm(lstm.words_to_idx('Where is he looking?'))
+# TODO can we make use of any of the following functions?
+# class MyDataset(Dataset):
+#     def __init__(self, image_paths, target_paths, train=True):
+#         self.image_paths = image_paths
+#         self.target_paths = target_paths
+#
+#     def transform(self, image, mask):
+#         # Resize
+#         resize = transforms.Resize(size=(520, 520))
+#         image = resize(image)
+#         mask = resize(mask)
+#
+#         # Random crop
+#         i, j, h, w = transforms.RandomCrop.get_params(
+#             image, output_size=(512, 512))
+#         image = TF.crop(image, i, j, h, w)
+#         mask = TF.crop(mask, i, j, h, w)
+#
+#         # Random horizontal flipping
+#         if random.random() > 0.5:
+#             image = TF.hflip(image)
+#             mask = TF.hflip(mask)
+#
+#         # Random vertical flipping
+#         if random.random() > 0.5:
+#             image = TF.vflip(image)
+#             mask = TF.vflip(mask)
+#
+#         # Transform to tensor
+#         image = TF.to_tensor(image)
+#         mask = TF.to_tensor(mask)
+#         return image, mask
+#
+#     def __getitem__(self, index):
+#         image = Image.open(self.image_paths[index])
+#         mask = Image.open(self.target_paths[index])
+#         x, y = self.transform(image, mask)
+#         return x, y
+#
+#     def __len__(self):
+#         return len(self.image_paths)
 
-    n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(lstm.parameters())])
-    print(f'============ # Parameters: {n_params}============')
+
+if __name__ == '__main__':
+    vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
+                                   questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
+                                   images_path='data/images',
+                                   phase='train')
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
+                                  collate_fn=lambda x: x)
+    for i_batch, batch in enumerate(train_dataloader):
+        print(i_batch, batch)
+
+    vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
+                                 questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
+                                 images_path='data/images',
+                                 phase='val')
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
+    for i_batch, batch in enumerate(val_dataloader):
+        print(i_batch, batch)
