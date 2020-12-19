@@ -158,9 +158,9 @@ def main():
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     batch_size = 64
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=16,
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=12,
                                   collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=16,
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=12,
                                 collate_fn=lambda x: x)
 
     word_embd_dim = 100
