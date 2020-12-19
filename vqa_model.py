@@ -1,6 +1,7 @@
 import math
 import torch
 import sys
+import os
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -157,9 +158,9 @@ def main():
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     batch_size = 64
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=12,
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=16,
                                   collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=12,
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=16,
                                 collate_fn=lambda x: x)
 
     word_embd_dim = 100
@@ -219,9 +220,6 @@ def main():
             train_epoch_losses.append(float(loss))
             optimizer.step()
 
-            # if i_batch * batch_size > 10000:
-            #     exit(777)
-
             if i_batch and i_batch % int(1000 / batch_size) == 0:
                 print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_images)} '
                       f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
@@ -240,14 +238,14 @@ def main():
 
         cur_epoch_loss, earlystopping, val_acc = \
             evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+
+        print(f"======================= Saving model with accuracy = {round(val_acc, 5)} ======================")
+        torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
+
         last_epoch_loss = cur_epoch_loss
         if earlystopping:
             print(f"========================== Earlystopping epoch = {epoch + 1} ==========================")
-            print(f"======================= Saving model with accuracy = {round(val_acc, 5)} ======================")
-            torch.save(model, f"vqa_model_val_acc={round(val_acc, 5)}.pth")
             break
-
-    torch.save(model, f"vqa_model_last_epoch.pth")
 
 
 # TODO:
@@ -256,7 +254,7 @@ def main():
 #  2. BCELoss with Sigmoid and soft_scores_target()
 #  3. Improve data read process -
 #   - Word to index and target - create them in Dataset
-#   - Upload all images resized to RAM (upload each image once)
+#  4. Maybe try working with num_workers for train and load ALL validation set to memory?
 # nohup python -u vqa_model.py > 1.out&
 
 if __name__ == '__main__':
