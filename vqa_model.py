@@ -118,7 +118,7 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss):
         return cur_epoch_loss_ev, loss_not_improved, val_acc
 
 
-if __name__ == '__main__':
+def main():
     # compute_targets()  TODO uncomment this
 
     running_on_linux = 'Linux' in platform.platform()
@@ -184,7 +184,7 @@ if __name__ == '__main__':
           f'initial_lr = {initial_lr}\n')
 
     last_epoch_loss = np.inf
-    epochs = 10
+    epochs = 1
     for epoch in range(epochs):
         train_epoch_losses = list()
         epoch_start_time = time.time()
@@ -214,12 +214,15 @@ if __name__ == '__main__':
             train_epoch_losses.append(loss.item())
             optimizer.step()
 
+            if i_batch > 15:
+                exit(777)
+
             if i_batch and i_batch % int(1000 / batch_size) == 0:
                 print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_images)} '
                       f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_images = time.time()
 
-            if i_batch and i_batch == int(len(val_dataloader) / 2):
+            if i_batch and i_batch == int(len(train_dataloader) / 2):
                 # evaluate in the middle of epoch, if no improvement in val loss, reduce lr (lr = lr / 2)
                 _, reduce_lr, _ = evaluate(val_dataloader, model, criterion, last_epoch_loss)
                 if reduce_lr:
@@ -240,8 +243,19 @@ if __name__ == '__main__':
 
     torch.save(model, f"vqa_model_last_epoch.pth")
 
+
 # TODO:
 #  1. choose a cnn with less params ??
 #   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
 #  2. BCELoss with Sigmoid and soft_scores_target()
 # nohup python -u vqa_model.py > 1.out&
+
+if __name__ == '__main__':
+    import cProfile
+
+    PROFFILE = 'prof.profile'
+    cProfile.run('main()', PROFFILE)
+    import pstats
+
+    p = pstats.Stats(PROFFILE)
+    p.sort_stats('tottime').print_stats(250)
