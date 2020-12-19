@@ -54,8 +54,49 @@ class VQA(nn.Module):
         return self.fc(pointwise_mul)
 
 
+def evaluate(dataLoader, model, criterion, last_epoch_loss):
+    with torch.no_grad():
+        accuracy = 0
+        val_epoch_losses = list()
+        for i_batch, batch in enumerate(dataLoader):
+            # answers
+            answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
+            target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
+
+            # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
+            images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
+
+            # questions
+            questions_batch_ = [sample['question'] for sample in batch]  # Natural language e.g. 'How many dogs?'
+
+            output = model(images_batch_, questions_batch_)
+
+            loss = criterion(output, target)
+            val_epoch_losses.append(loss.item())
+
+            pred = torch.argmax(output, dim=1)
+            scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
+                      for sample in batch]
+
+            for i, prediction in enumerate(pred):
+                sample_score = scores[i]
+                if int(prediction) in sample_score:
+                    accuracy += sample_score[int(prediction)]
+
+        val_acc = accuracy / len(vqa_val_dataset)
+        print(f'Validation accuracy = {round(val_acc, 5)}')
+        cur_epoch_loss = float(np.mean(val_epoch_losses))
+        print(f'Validation loss = {round(cur_epoch_loss, 5)}')
+        if cur_epoch_loss < last_epoch_loss:
+            loss_not_improved = False
+        else:
+            loss_not_improved = True
+
+        return cur_epoch_loss, loss_not_improved
+
+
 if __name__ == '__main__':
-    # compute_targets()
+    # compute_targets()  TODO uncomment this
 
     running_on_linux = 'Linux' in platform.platform()
 
@@ -91,7 +132,7 @@ if __name__ == '__main__':
 
     batch_size = 32
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=lambda x: x)
 
     lstm_params_ = {'word_embd_dim': 100, 'lstm_hidden_dim': 1280, 'n_layers': 1,
                     'train_question_path': train_questions_json_path}
@@ -108,66 +149,60 @@ if __name__ == '__main__':
 
     print(f'Device: {model.device}')
 
-    epochs = 50
+    last_epoch_loss = np.inf
+    epochs = 10
     for epoch in range(epochs):
-        epoch_losses = list()
+        train_epoch_losses = list()
         epoch_start_time = time.time()
         timer_images = time.time()
         for i_batch, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
-
-            # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
-            images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
-
-            # questions
-            questions_batch_ = [sample['question'] for sample in batch]  # Natural language e.g. 'How many dogs?'
-
             # answers
             answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
             target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
+            # don't learn from questions without answers
+            idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
+            target = target[target != model.num_classes]
+
+            # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
+            images_batch_ = torch.stack([sample['image'] for idx, sample in enumerate(batch)
+                                         if idx not in idx_questions_without_answers], dim=0).to(model.device)
+
+            # questions
+            # Natural language e.g. questions_batch_ = ['How many dogs?'...]
+            questions_batch_ = [sample['question'] for idx, sample in enumerate(batch)
+                                if idx not in idx_questions_without_answers]
+
             output = model(images_batch_, questions_batch_)
             loss = criterion(output, target)
             loss.backward()
-            epoch_losses.append(loss.item())
+            train_epoch_losses.append(loss.item())
             optimizer.step()
 
-            if i_batch % int(1000 / batch_size) == 0:
+            if i_batch and i_batch % int(1000 / batch_size) == 0:
                 print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_images)} '
                       f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_images = time.time()
-        print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(epoch_losses)), 4)}")
+
+            if i_batch and i_batch == int(len(val_dataloader) / 2):
+                # evaluate in the middle of epoch, if no improvement in val loss, reduce lr (lr = lr / 2)
+                _, reduce_lr = evaluate(val_dataloader, model, criterion, last_epoch_loss)
+                if reduce_lr:
+                    print("========================== Reduce Learning Rate ==========================")
+                    print(f"{optimizer.param_groups[0]['lr']} >>>> {optimizer.param_groups[0]['lr'] / 2}")
+                    optimizer.param_groups[0]['lr'] /= 2
+
+        print(f"epoch {epoch + 1}/{epochs} mean loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
-        with torch.no_grad():
-            accuracy = 0
-            for i_batch, batch in enumerate(val_dataloader):
-                # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
-                images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
-
-                # questions
-                questions_batch_ = [sample['question'] for sample in batch]  # Natural language e.g. 'How many dogs?'
-
-                # answers
-                answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
-                target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
-
-                output = model(images_batch_, questions_batch_)
-
-                pred = torch.argmax(output, dim=1)
-                scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
-                          for sample in batch]
-
-                for i, prediction in enumerate(pred):
-                    sample_score = scores[i]
-                    if int(prediction) in sample_score:
-                        accuracy += sample_score[int(prediction)]
-
-            val_acc = accuracy / len(vqa_val_dataset)
-            print(f'Validation accuracy = {round(val_acc, 5)}')
+        cur_epoch_loss, earlystopping = evaluate(val_dataloader, model, criterion, last_epoch_loss)
+        last_epoch_loss = cur_epoch_loss
+        if earlystopping:
+            print("========================== Earlystopping ==========================")
+            break
 
 # TODO:
 #  1. choose a cnn with less params ??
 #   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
-#  2. early stopping, reduce lr on plateau
-#  3. smaller words vocabulary in LSTM ??
+#  2. smaller words vocabulary in LSTM ??
