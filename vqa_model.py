@@ -128,15 +128,15 @@ def main():
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/datashare',
-                                       force_read=True,
+                                       force_read=False,
                                        phase='train')
-        print(f'sizeof self.images_tensors {len(vqa_train_dataset.images_tensors)} images: '
-              f'{sys.getsizeof(vqa_train_dataset.images_tensors)}')
-        exit(777)  # TODO
+        # print(f'sizeof self.images_tensors {len(vqa_train_dataset.images_tensors)} images: '
+        #       f'{sys.getsizeof(vqa_train_dataset.images_tensors)}')
+        # exit(777)  # TODO
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/datashare',
-                                     force_read=True,
+                                     force_read=False,
                                      phase='val')
 
         train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'

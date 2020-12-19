@@ -54,7 +54,7 @@ class VQADataset(Dataset):
             self.read_images()
 
     def read_images(self):
-        image_ids = list(set([q['image_id'] for q in self.questions]))[:1000]  # TODO
+        image_ids = set([question['image_id'] for question in self.questions])
         for image_id in image_ids:
             # full path to image
             # the image .jpg path contains 12 chars for image id
