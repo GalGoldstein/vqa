@@ -11,7 +11,7 @@ from PIL import Image
 from torchvision import transforms
 import random
 import torchvision.transforms.functional as TF
-import lstm
+
 
 class VQADataset(Dataset):
     # TODO hyperparameters:
@@ -32,8 +32,6 @@ class VQADataset(Dataset):
         """
         self.target = pickle.load(open(target_pickle_path, "rb"))
         self.questions = json.load(open(questions_json_path))['questions']
-        for question in self.questions:
-            question['question'] = ' '.join(lstm.LSTM.preprocess_question_string(question['question']))
         self.img_path = images_path
         self.phase = phase
 

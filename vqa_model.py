@@ -31,7 +31,7 @@ class VQA(nn.Module):
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
-        self.fc = nn.Linear(fc_size, self.num_classes)
+        self.fc = nn.Linear(fc_size, self.num_classes + 1)  # +1 for questions with answer that has no class
 
     def answers_to_one_hot(self, answers_labels_batch):
         all_answers = list()
@@ -54,52 +54,29 @@ class VQA(nn.Module):
         return self.fc(pointwise_mul)
 
 
-def soft_scores_target(batch, n_classes):
-    idx_questions_without_answers = list()
-    targets = []
-    soft_scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])} for sample in batch]
-    for i, soft_score_dict in enumerate(soft_scores):
-        if soft_score_dict:
-            target = torch.zeros(n_classes)
-            for label, score in soft_score_dict.items():
-                target[label] = score
-            targets.append(target)
-        else:
-            idx_questions_without_answers.append(i)
-
-    return idx_questions_without_answers, torch.stack(targets, dim=0)
-
-
 def evaluate(dataLoader, model, criterion, last_epoch_loss):
     with torch.no_grad():
         accuracy = 0
         val_epoch_losses = list()
-        for i_batch_ev, batch_ev in enumerate(dataLoader):
+        for i_batch, batch in enumerate(dataLoader):
             # answers
-            answers_labels_batch__ev = [sample['answer']['label_counts'] for sample in batch_ev]
-            target_ev = model.answers_to_one_hot(answers_labels_batch__ev).to(model.device)
-
-            # don't learn from questions without answers
-            idx_questions_without_answers_ev = torch.nonzero(target_ev == model.num_classes, as_tuple=False)
-            target_ev = target_ev[target_ev != model.num_classes]
+            answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
+            target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
             # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
-            images_batch__ev = torch.stack([sample['image'] for idx, sample in enumerate(batch_ev)
-                                            if idx not in idx_questions_without_answers_ev], dim=0).to(model.device)
+            images_batch_ = torch.stack([sample['image'] for sample in batch], dim=0).to(model.device)
 
             # questions
-            # Natural language e.g. questions_batch_ = ['How many dogs?'...]
-            questions_batch__ev = [sample['question'] for idx, sample in enumerate(batch_ev)
-                                   if idx not in idx_questions_without_answers_ev]
+            questions_batch_ = [sample['question'] for sample in batch]  # Natural language e.g. 'How many dogs?'
 
-            output_ev = model(images_batch__ev, questions_batch__ev)
+            output = model(images_batch_, questions_batch_)
 
-            loss_ev = criterion(output_ev, target_ev)
-            val_epoch_losses.append(loss_ev.item())
+            loss = criterion(output, target)
+            val_epoch_losses.append(loss.item())
 
-            pred = torch.argmax(output_ev, dim=1)
+            pred = torch.argmax(output, dim=1)
             scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
-                      for sample in batch_ev]
+                      for sample in batch]
 
             for i, prediction in enumerate(pred):
                 sample_score = scores[i]
@@ -108,14 +85,14 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss):
 
         val_acc = accuracy / len(vqa_val_dataset)
         print(f'Validation accuracy = {round(val_acc, 5)}')
-        cur_epoch_loss_ev = float(np.mean(val_epoch_losses))
-        print(f'Validation loss = {round(cur_epoch_loss_ev, 5)}')
-        if cur_epoch_loss_ev < last_epoch_loss:
+        cur_epoch_loss = float(np.mean(val_epoch_losses))
+        print(f'Validation loss = {round(cur_epoch_loss, 5)}')
+        if cur_epoch_loss < last_epoch_loss:
             loss_not_improved = False
         else:
             loss_not_improved = True
 
-        return cur_epoch_loss_ev, loss_not_improved, val_acc
+        return cur_epoch_loss, loss_not_improved
 
 
 if __name__ == '__main__':
@@ -221,27 +198,21 @@ if __name__ == '__main__':
 
             if i_batch and i_batch == int(len(val_dataloader) / 2):
                 # evaluate in the middle of epoch, if no improvement in val loss, reduce lr (lr = lr / 2)
-                _, reduce_lr, _ = evaluate(val_dataloader, model, criterion, last_epoch_loss)
+                _, reduce_lr = evaluate(val_dataloader, model, criterion, last_epoch_loss)
                 if reduce_lr:
                     print("========================== Reduce Learning Rate ==========================")
-                    print(f"learning rate: {optimizer.param_groups[0]['lr']} >> {optimizer.param_groups[0]['lr'] / 2}")
+                    print(f"{optimizer.param_groups[0]['lr']} >>>> {optimizer.param_groups[0]['lr'] / 2}")
                     optimizer.param_groups[0]['lr'] /= 2
 
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
-        cur_epoch_loss, earlystopping, val_acc = evaluate(val_dataloader, model, criterion, last_epoch_loss)
+        cur_epoch_loss, earlystopping = evaluate(val_dataloader, model, criterion, last_epoch_loss)
         last_epoch_loss = cur_epoch_loss
         if earlystopping:
-            print(f"========================== Earlystopping epoch = {epoch + 1} ==========================")
-            print(f"======================= Saving model with accuracy = {round(val_acc, 5)} ======================")
-            torch.save(model, f"vqa_model_val_acc={round(val_acc, 5)}.pth")
+            print("========================== Earlystopping ==========================")
             break
-
-    torch.save(model, f"vqa_model_last_epoch.pth")
 
 # TODO:
 #  1. choose a cnn with less params ??
 #   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
-#  2. BCELoss with Sigmoid and soft_scores_target()
-# nohup python -u vqa_model.py > 1.out&
