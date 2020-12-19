@@ -130,24 +130,35 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    batch_size = 32
+    batch_size = 64
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, collate_fn=lambda x: x)
 
-    lstm_params_ = {'word_embd_dim': 100, 'lstm_hidden_dim': 1280, 'n_layers': 1,
+    word_embd_dim = 100
+    lstm_hidden_dim = 1280
+    LSTM_layers = 1
+    lstm_params_ = {'word_embd_dim': word_embd_dim, 'lstm_hidden_dim': lstm_hidden_dim, 'n_layers': LSTM_layers,
                     'train_question_path': train_questions_json_path}
 
-    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, fc_size=1280)
+    fc_size = 1280
+    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, fc_size=fc_size)
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    initial_lr = 0.01
+    optimizer = optim.Adam(model.parameters(), lr=initial_lr)
 
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
     print(f'============ # Parameters: {n_params}============')
-
     print(f'Device: {model.device}')
+
+    print(f'batch_size = {batch_size}'
+          f'word_embd_dim = {word_embd_dim}\n'
+          f'lstm_hidden_dim = {lstm_hidden_dim}\n'
+          f'LSTM_layers = {LSTM_layers}\n'
+          f'VQA fc_size = {fc_size}\n'
+          f'initial_lr = {initial_lr}\n')
 
     last_epoch_loss = np.inf
     epochs = 10
