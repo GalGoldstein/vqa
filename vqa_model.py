@@ -122,6 +122,7 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss, vqa_val_dataset):
 
 def main():
     # compute_targets()  TODO uncomment this
+    torch.multiprocessing.set_sharing_strategy('file_system')
 
     running_on_linux = 'Linux' in platform.platform()
 
