@@ -126,6 +126,8 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss, vqa_val_dataset):
 
 def main():
     # compute_targets()  TODO uncomment this
+
+    # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
     torch.multiprocessing.set_sharing_strategy('file_system')
 
     running_on_linux = 'Linux' in platform.platform()
@@ -139,7 +141,7 @@ def main():
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/datashare',
-                                     force_read=True,
+                                     force_read=False,
                                      phase='val')
 
         train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'
@@ -156,16 +158,16 @@ def main():
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='data/images',
-                                     force_read=True,
+                                     force_read=False,
                                      phase='val')
         train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     batch_size = 64
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=12,
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=16,
                                   collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=12,
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=16,
                                 collate_fn=lambda x: x)
 
     word_embd_dim = 100
