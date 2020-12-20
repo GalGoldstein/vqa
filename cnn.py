@@ -339,14 +339,15 @@ https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
 #     def forward(self, x):
 #         x = self.pool(F.relu(self.conv1(x)))
 #         x = self.pool(F.relu(self.conv2(x)))
-#         x = x.view(-1, 16 * 5 * 5)
+#         x = x.view(-1, 16 * 5 * 5)  # x.shape[1] * x.shape[2] * x.shape[3])
 #         x = F.relu(self.fc1(x))
 #         x = F.relu(self.fc2(x))
 #         x = self.fc3(x)
 #         return x
-
-
+#
+#
 # net = SimpleCNN()
+# net(torch.rand((3, 32, 32))[None, ...])
 
 if __name__ == "__main__":
     from dataset import VQADataset

@@ -33,6 +33,7 @@ class VQA(nn.Module):
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
+        self.relu = nn.ReLU()
         self.fc = nn.Linear(fc_size, self.num_classes)
 
     def answers_to_one_hot(self, answers_labels_batch):
@@ -56,7 +57,7 @@ class VQA(nn.Module):
 
         pointwise_mul = torch.mul(images_representation, questions_representation)
 
-        return self.fc(pointwise_mul)
+        return self.fc(self.relu(pointwise_mul))
 
 
 def soft_scores_target(batch, n_classes):
@@ -165,9 +166,10 @@ def main():
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     batch_size = 64
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=16,
+    num_workers = 12 if running_on_linux else 0
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
                                   collate_fn=lambda x: x)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=16,
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                 collate_fn=lambda x: x)
 
     word_embd_dim = 100
@@ -194,7 +196,10 @@ def main():
           f'lstm_hidden_dim = {lstm_hidden_dim}\n'
           f'LSTM_layers = {LSTM_layers}\n'
           f'VQA fc_size = {fc_size}\n'
-          f'initial_lr = {initial_lr}\n')
+          f'initial_lr = {initial_lr}\n'
+          f'num_workers = {num_workers}\n'
+          f'Image model = {model.cnn._get_name()}\n'
+          f'Question model = {model.lstm._get_name()}\n')
 
     last_epoch_loss = np.inf
     epochs = 10
@@ -246,22 +251,22 @@ def main():
         cur_epoch_loss, earlystopping, val_acc = \
             evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
-        print(f"================ Saving epoch {epoch + 1} model with accuracy = {round(val_acc, 5)} ==============")
+        print(f"============ Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ==========")
         torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
 
         last_epoch_loss = cur_epoch_loss
         if earlystopping:
-            print(f"========================== Earlystopping epoch = {epoch + 1} ==========================")
+            print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
             break
 
 
 # TODO:
-#  1. choose a cnn with less params ??
+#  1. Choose a more simple CNN ??
 #   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
 #  2. BCELoss with Sigmoid and soft_scores_target()
-#  3. Improve data read process -
+#  3. Improve data read process (for speed) -
 #   - Word to index and target - create them in Dataset
-#  4. Maybe try working with num_workers for train and load ALL validation set to memory?
+#  4. If continuing to fail - try 'ulimit' to fix the num_workers errors
 # nohup python -u vqa_model.py > 1.out&
 
 if __name__ == '__main__':

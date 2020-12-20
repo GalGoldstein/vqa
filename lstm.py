@@ -7,6 +7,18 @@ import platform
 import re
 import json
 
+NUMBERS = {'0': 'zero',
+           '1': 'one',
+           '2': 'two',
+           '3': 'three',
+           '4': 'four',
+           '5': 'five',
+           '6': 'six',
+           '7': 'seven',
+           '8': 'eight',
+           '9': 'nine',
+           '10': 'ten'}
+
 
 class LSTM(nn.Module):
     def __init__(self, word_embd_dim, lstm_hidden_dim, n_layers, train_question_path):
@@ -23,7 +35,7 @@ class LSTM(nn.Module):
 
         # TODO hyper parameters: min_freq, specials?
         #  pre-processing of questions words? lower?
-        vocab = Vocab(Counter(self.word_dict), vectors=None, min_freq=1, specials=['<unk>'])
+        vocab = Vocab(Counter(self.word_dict), vectors=None, min_freq=1, specials=['<unk>', '<pad>'])
         # set rand vectors and get the weights (the vector embeddings themselves)
         words_embeddings_tensor = nn.Embedding(len(vocab.stoi), word_embd_dim).weight.data
         vocab.set_vectors(stoi=vocab.stoi, vectors=words_embeddings_tensor, dim=word_embd_dim)
@@ -42,7 +54,9 @@ class LSTM(nn.Module):
             3. any word with number >> <number>
         """
         result = question[0].upper() + question[1:].lower()
-        words = result.split(' ')
+        # changing 0,1,...,10 to the name of the number e.g. ten >> 10
+        words = [NUMBERS[word] if word in NUMBERS else word for word in result.split(' ')]
+        # if we still have a number in a word conver it to general number '<number>'
         result = [('<number>' if any(char.isdigit() for char in word) else re.sub(r'[\W_]+', '', word))
                   for word in words]
         return result
@@ -71,14 +85,16 @@ class LSTM(nn.Module):
         return question_word_idx_tensor.to(self.device)
 
     def forward(self, word_idx_tensor):
-        word_embeddings = self.word_embedding(word_idx_tensor)
+        trimmed = word_idx_tensor[:14]
+        padded = torch.cat([trimmed, torch.tensor([self.word_idx_mappings['<pad>']] * (14 - len(trimmed)))])
+        word_embeddings = self.word_embedding(padded)
         output, _ = self.encoder(word_embeddings[None, ...])  # currently supporting only a single sentence
         return output[0][-1]  # return only last hidden state, of the last layer of LSTM
 
 
 if __name__ == "__main__":
     lstm = LSTM(100, 1024, 2, 'data/v2_OpenEnded_mscoco_train2014_questions.json')
-    out = lstm(lstm.words_to_idx('Where is he looking?'))
+    out = lstm(lstm.words_to_idx(' '.join(lstm.preprocess_question_string('Where is he looking?'))))
 
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(lstm.parameters())])
     print(f'============ # Parameters: {n_params}============')

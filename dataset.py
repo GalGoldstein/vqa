@@ -176,7 +176,7 @@ if __name__ == '__main__':
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
-                                   force_read=True,
+                                   force_read=False,
                                    phase='train')
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                   collate_fn=lambda x: x)
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path=val_questions_json_path,
                                  images_path=images_path,
-                                 force_read=True,
+                                 force_read=False,
                                  phase='val')
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
     for i_batch, batch in enumerate(val_dataloader):
