@@ -86,10 +86,9 @@ class LSTM(nn.Module):
 
     def forward(self, word_idx_tensor):
         trimmed = word_idx_tensor[:14]
-        # padding_size = 14 - len(trimmed)
-        # padded = torch.cat([trimmed, torch.tensor([self.word_idx_mappings['<pad>']] * padding_size).to(self.device)])
-        padded = trimmed
-        word_embeddings = self.word_embedding(padded)
+        padding_size = 14 - len(trimmed)
+        padded = torch.cat([trimmed, torch.tensor([self.word_idx_mappings['<pad>']] * padding_size).to(self.device)])
+        word_embeddings = self.word_embedding(padded.long())
         output, _ = self.encoder(word_embeddings[None, ...])  # currently supporting only a single sentence
         return output[0][-1]  # return only last hidden state, of the last layer of LSTM
 
