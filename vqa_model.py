@@ -36,6 +36,9 @@ class VQA(nn.Module):
         self.fc = nn.Linear(fc_size, self.num_classes)
 
     def answers_to_one_hot(self, answers_labels_batch):
+        """
+            answers_labels_batch = [{label:count #people chose this label as answer} ... ]
+        """
         all_answers = list()
         for labels_count_dict in answers_labels_batch:
             if labels_count_dict:  # not empty dict
@@ -73,6 +76,7 @@ def soft_scores_target(batch, n_classes):
 
 
 def evaluate(dataLoader, model, criterion, last_epoch_loss, vqa_val_dataset):
+    print('============ Evaluating on validation set ============')
     with torch.no_grad():
         accuracy = 0
         val_epoch_losses = list()
@@ -135,7 +139,7 @@ def main():
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/datashare',
-                                     force_read=False,
+                                     force_read=True,
                                      phase='val')
 
         train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'
@@ -146,7 +150,7 @@ def main():
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='data/images',
-                                       force_read=True,
+                                       force_read=False,
                                        phase='train')
 
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
@@ -240,7 +244,7 @@ def main():
         cur_epoch_loss, earlystopping, val_acc = \
             evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
-        print(f"======================= Saving model with accuracy = {round(val_acc, 5)} ======================")
+        print(f"================ Saving epoch {epoch + 1} model with accuracy = {round(val_acc, 5)} ==============")
         torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
 
         last_epoch_loss = cur_epoch_loss
