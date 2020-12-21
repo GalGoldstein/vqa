@@ -72,6 +72,19 @@ class VQADataset(Dataset):
             # this also divides by 255 TODO we can normalize too
             self.images_tensors[int(image_id)] = TF.to_tensor(image)
 
+    @staticmethod
+    def load_img_from_path(image_path):
+        image = Image.open(image_path).convert('RGB')
+
+        # TODO - set parameter for resize in args
+        #  what is the size we want?
+        # Resize
+        resize = transforms.Resize(size=(224, 224))
+        image = resize(image)
+
+        # this also divides by 255 TODO we can normalize too
+        return TF.to_tensor(image)
+
     def __len__(self):
         return len(self.target)
 
@@ -100,20 +113,16 @@ class VQADataset(Dataset):
         else:
             # the image .jpg path contains 12 chars for image id
             image_id = str(question_dict['image_id']).zfill(12)
-
-            # full path to image
             image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.jpg')
 
-            image = Image.open(image_path).convert('RGB')
+            try:  # full path to image
+                image_tensor = self.load_img_from_path(image_path)
 
-            # TODO - set parameter for resize in args
-            #  what is the size we want?
-            # Resize
-            resize = transforms.Resize(size=(224, 224))
-            image = resize(image)
-
-            # this also divides by 255 TODO we can normalize too
-            image_tensor = TF.to_tensor(image)
+            except:
+                print(f'Failed in __getitem__ ... trying to load again\n'
+                      f'image path: {image_path}')
+                time.sleep(1)
+                image_tensor = self.load_img_from_path(image_path)
 
         return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
 
