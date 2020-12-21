@@ -15,6 +15,8 @@ import pickle
 import platform
 import time
 
+torch.cuda.empty_cache()
+
 
 class VQA(nn.Module):
     def __init__(self, lstm_params, label2ans_path, fc_size, target_type):
