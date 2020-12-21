@@ -33,7 +33,7 @@ class VQA(nn.Module):
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
-        self.relu = nn.ReLU()
+        self.activation = nn.Sigmoid()
         self.fc = nn.Linear(fc_size, self.num_classes)
 
     def answers_to_one_hot(self, answers_labels_batch):
@@ -57,7 +57,7 @@ class VQA(nn.Module):
 
         pointwise_mul = torch.mul(images_representation, questions_representation)
 
-        return self.fc(self.relu(pointwise_mul))
+        return self.fc(self.activation(pointwise_mul))
 
 
 def soft_scores_target(batch, n_classes):
@@ -166,7 +166,7 @@ def main():
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     batch_size = 64
-    num_workers = 12 if running_on_linux else 0
+    num_workers = 16 if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
                                   collate_fn=lambda x: x)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
@@ -199,7 +199,8 @@ def main():
           f'initial_lr = {initial_lr}\n'
           f'num_workers = {num_workers}\n'
           f'Image model = {model.cnn._get_name()}\n'
-          f'Question model = {model.lstm._get_name()}\n')
+          f'Question model = {model.lstm._get_name()}\n'
+          f'Activation = {model.activation._get_name()}')
 
     last_epoch_loss = np.inf
     epochs = 10
