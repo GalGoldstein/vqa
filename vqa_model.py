@@ -17,7 +17,7 @@ import time
 
 
 class VQA(nn.Module):
-    def __init__(self, lstm_params, label2ans_path, fc_size):
+    def __init__(self, lstm_params, label2ans_path, fc_size, target_type):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -33,7 +33,8 @@ class VQA(nn.Module):
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
-        self.activation = nn.Sigmoid()
+        self.target_type = target_type
+        self.activation = nn.ReLU()
         self.fc = nn.Linear(fc_size, self.num_classes)
 
     def answers_to_one_hot(self, answers_labels_batch):
@@ -60,10 +61,10 @@ class VQA(nn.Module):
         return self.fc(self.activation(pointwise_mul))
 
 
-def soft_scores_target(batch, n_classes):
+def soft_scores_target(answers_batch, n_classes):
     idx_questions_without_answers = list()
     targets = []
-    soft_scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])} for sample in batch]
+    soft_scores = [{k: v for k, v in zip(sample['labels'], sample['scores'])} for sample in answers_batch]
     for i, soft_score_dict in enumerate(soft_scores):
         if soft_score_dict:
             target = torch.zeros(n_classes)
@@ -82,13 +83,17 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss, vqa_val_dataset):
         accuracy = 0
         val_epoch_losses = list()
         for i_batch_ev, batch_ev in enumerate(dataLoader):
-            # answers
-            answers_labels_batch__ev = [sample['answer']['label_counts'] for sample in batch_ev]
-            target_ev = model.answers_to_one_hot(answers_labels_batch__ev).to(model.device)
+            if model.target_type == 'onehot':
+                # answers
+                answers_labels_batch__ev = [sample['answer']['label_counts'] for sample in batch_ev]
+                target_ev = model.answers_to_one_hot(answers_labels_batch__ev).to(model.device)
 
-            # don't learn from questions without answers
-            idx_questions_without_answers_ev = torch.nonzero(target_ev == model.num_classes, as_tuple=False)
-            target_ev = target_ev[target_ev != model.num_classes]
+                # don't learn from questions without answers
+                idx_questions_without_answers_ev = torch.nonzero(target_ev == model.num_classes, as_tuple=False)
+                target_ev = target_ev[target_ev != model.num_classes]
+            else:  # target_type='softscore'
+                answers_ev = [sample['answer'] for sample in batch_ev]
+                idx_questions_without_answers_ev, target_ev = soft_scores_target(answers_ev, model.num_classes)
 
             # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch__ev = torch.stack([sample['image'] for idx, sample in enumerate(batch_ev)
@@ -165,7 +170,7 @@ def main():
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    batch_size = 64
+    batch_size = 384
     num_workers = 12 if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
                                   collate_fn=lambda x: x)
@@ -179,44 +184,54 @@ def main():
                     'train_question_path': train_questions_json_path}
 
     fc_size = 1280
-    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, fc_size=fc_size)
+    target_type = 'onehot'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
+    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, fc_size=fc_size, target_type=target_type)
     model = model.to(model.device)
 
-    criterion = nn.CrossEntropyLoss()
-    initial_lr = 0.01
+    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss()
+    initial_lr = 0.001
+    patience = 2  # how many epochs without val loss improvement to stop training
     optimizer = optim.Adam(model.parameters(), lr=initial_lr)
 
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
     print(f'============ # Parameters: {n_params}============')
-    print(f'Device: {model.device}')
 
     print(f'batch_size = {batch_size}\n'
+          f'Device: {model.device}'
           f'word_embd_dim = {word_embd_dim}\n'
           f'lstm_hidden_dim = {lstm_hidden_dim}\n'
           f'LSTM_layers = {LSTM_layers}\n'
           f'VQA fc_size = {fc_size}\n'
           f'initial_lr = {initial_lr}\n'
+          f'patience = {patience}\n'
+          f'target_type = {target_type}\n'
           f'num_workers = {num_workers}\n'
           f'Image model = {model.cnn._get_name()}\n'
           f'Question model = {model.lstm._get_name()}\n'
-          f'Activation = {model.activation._get_name()}')
+          f'Activation = {model.activation._get_name()}'
+          f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
     epochs = 10
+    count_no_improvement = 0
     for epoch in range(epochs):
         train_epoch_losses = list()
         epoch_start_time = time.time()
         timer_images = time.time()
         for i_batch, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
-            # answers
-            answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
-            target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
+            if model.target_type == 'onehot':
+                # answers
+                answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
+                target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
-            # don't learn from questions without answers
-            idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
-            target = target[target != model.num_classes]
+                # don't learn from questions without answers
+                idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
+                target = target[target != model.num_classes]
+            else:  # target_type='softscore'
+                answers = [sample['answer'] for sample in batch]
+                idx_questions_without_answers, target = soft_scores_target(answers, model.num_classes)
 
             # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch_ = torch.stack([sample['image'] for idx, sample in enumerate(batch)
@@ -238,25 +253,32 @@ def main():
                       f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_images = time.time()
 
-            if i_batch and i_batch == int(len(train_dataloader) / 2):
-                # evaluate in the middle of epoch, if no improvement in val loss, reduce lr (lr = lr / 2)
-                _, reduce_lr, _ = evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
-                if reduce_lr:
-                    print("========================== Reduce Learning Rate ==========================")
-                    print(f"learning rate: {optimizer.param_groups[0]['lr']} >> {optimizer.param_groups[0]['lr'] / 2}")
-                    optimizer.param_groups[0]['lr'] /= 2
+            # TODO this lines evaluate in the middle of the epoch - DELETE
+            # if i_batch and i_batch == int(len(train_dataloader) / 2):
+            #     # evaluate in the middle of epoch, if no improvement in val loss, reduce lr (lr = lr / 2)
+            #     _, reduce_lr, _ = evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+            #     if reduce_lr:
+            #         print("========================== Reduce Learning Rate ==========================")
+            #         print(f"learning rate: {optimizer.param_groups[0]['lr']} > {optimizer.param_groups[0]['lr'] / 2}")
+            #         optimizer.param_groups[0]['lr'] /= 2
 
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
-        cur_epoch_loss, earlystopping, val_acc = \
+        cur_epoch_loss, val_loss_didnt_improve, val_acc = \
             evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+
+        if val_loss_didnt_improve:
+            count_no_improvement += 1
+            print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
+        else:
+            count_no_improvement = 0
 
         print(f"============ Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ==========")
         torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
 
         last_epoch_loss = cur_epoch_loss
-        if earlystopping:
+        if count_no_improvement >= patience:
             print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
             break
 
@@ -264,10 +286,22 @@ def main():
 # TODO:
 #  1. Choose a more simple CNN ??
 #   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
-#  2. BCELoss with Sigmoid and soft_scores_target()
+#  2. BCEWithLogitsLoss and soft_scores_target()
 #  3. Improve data read process (for speed) -
 #   - Word to index and target - create them in Dataset
 #  4. If continuing to fail - try 'ulimit' to fix the num_workers errors
+#  5. Architecture:
+#   - A) Gated tanh on each of the representations
+#        Multiplication
+#        Gated tanh on the multiplication
+#        Fully connected to #classes dim
+#        and then BCELossWithLogits
+#   - B) F.normalize(x, p=2, dim=1) image representations
+#  6. optimizers:
+#    A) torch.optim.Adadelta - no need to adjust lr
+#    B) torch.optim.Adamax
+#  7. Reduce lr to 0.001 as a first try  [V]
+#  8. Increase batch size significantly >> 384 ? [V]
 # nohup python -u vqa_model.py > 1.out&
 
 if __name__ == '__main__':
