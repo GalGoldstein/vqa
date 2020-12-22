@@ -18,6 +18,7 @@ import time
 if 'Linux' in platform.platform():
     import resource
 
+    torch.cuda.empty_cache()
     # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
     rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))  # TODO increase if any problems
