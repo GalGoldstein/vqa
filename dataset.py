@@ -12,7 +12,7 @@ from torchvision import transforms
 import random
 import time
 import torchvision.transforms.functional as TF
-import lstm
+import gru
 import sys
 
 
@@ -38,7 +38,7 @@ class VQADataset(Dataset):
         self.target = pickle.load(open(target_pickle_path, "rb"))
         self.questions = json.load(open(questions_json_path))['questions']
         for question in self.questions:
-            question['question'] = ' '.join(lstm.LSTM.preprocess_question_string(question['question']))
+            question['question'] = ' '.join(gru.GRU.preprocess_question_string(question['question']))
         self.img_path = images_path
         self.phase = phase
         self.force_read = force_read

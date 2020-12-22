@@ -10,7 +10,7 @@ from dataset import VQADataset
 from compute_softscore import compute_targets
 import numpy as np
 import cnn
-import lstm
+import gru
 import pickle
 import platform
 import time
@@ -26,26 +26,17 @@ if 'Linux' in platform.platform():
 # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
 # torch.multiprocessing.set_sharing_strategy('file_system') # TODO maybe delete?
 
-# TODO - Change architecture:
-#  LSTM >> GRU []
-#  CNN: MobileNetV2 >> simple net
-#  gated tanh
-
 class VQA(nn.Module):
-    def __init__(self, lstm_params, label2ans_path, target_type, img_feature_dim):
+    def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        # self.cnn = cnn.Xception().to(self.device)
-        # self.cnn = cnn.MobileNetV2().to(self.device)
         self.cnn = cnn.CNN().to(self.device)
 
-        self.lstm = lstm.LSTM(lstm_params['word_embd_dim'],
-                              lstm_params['lstm_hidden_dim'],
-                              lstm_params['n_layers'],
-                              lstm_params['train_question_path']).to(self.device)
+        self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
+                           gru_params['train_question_path']).to(self.device)
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
@@ -53,17 +44,17 @@ class VQA(nn.Module):
 
         self.tanh = nn.Tanh()
         self.sigmoid = nn.Sigmoid()
-        self.softmax = nn.Softmax()  # TODO dim?
+        self.softmax = nn.Softmax(dim=1)
 
         # gated tanh activation before attention
-        self.linear_inside_tanh_attention = nn.Linear(img_feature_dim + lstm_params['lstm_hidden_dim'], 512)
-        self.linear_inside_sigmoid_attention = nn.Linear(img_feature_dim + lstm_params['lstm_hidden_dim'], 512)
+        self.linear_inside_tanh_attention = nn.Linear(img_feature_dim + gru_params['question_hidden_dim'], 512)
+        self.linear_inside_sigmoid_attention = nn.Linear(img_feature_dim + gru_params['question_hidden_dim'], 512)
         # linear layer after gated tanh activation before attention
         self.linear_after_gated_tanh_attention = nn.Linear(512, 1, bias=False)
 
         # gated tanh activation hidden representation of question
-        self.linear_inside_tanh_question = nn.Linear(lstm_params['lstm_hidden_dim'], 512)
-        self.linear_inside_sigmoid_question = nn.Linear(lstm_params['lstm_hidden_dim'], 512)
+        self.linear_inside_tanh_question = nn.Linear(gru_params['question_hidden_dim'], 512)
+        self.linear_inside_sigmoid_question = nn.Linear(gru_params['question_hidden_dim'], 512)
 
         # gated tanh activation hidden representation of image
         self.linear_inside_tanh_image = nn.Linear(img_feature_dim, 512)
@@ -91,31 +82,35 @@ class VQA(nn.Module):
         return torch.tensor(all_answers)
 
     def forward(self, images_batch, questions_batch):
-        # images_representation should be [batch , k , d]
+        # images_representation should be [batch , k , d] where k = number features of image, d = dim of every feature
         images_representation = self.cnn(images_batch)
-        questions_last_hidden = [self.lstm(self.lstm.words_to_idx(question)) for question in questions_batch]
+        questions_last_hidden = [self.gru(self.gru.words_to_idx(question)) for question in questions_batch]
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
-        # TODO write: concat the image and the question hideen dim
-        concat = None  # TODO size = [batch, k, d + 512]  512 for hidden dim of LSTM / GRU
+        expand_dim = [images_representation.shape[1],
+                      questions_representation.shape[0],
+                      questions_representation.shape[1]]
+        concat = torch.cat((images_representation, questions_representation.expand(expand_dim).permute(1, 0, 2)), dim=2)
         gated_tanh_attention = torch.mul(self.tanh(self.linear_inside_tanh_attention(concat)),
                                          self.sigmoid(self.linear_inside_sigmoid_attention(concat)))
 
-        # TODO write: softmax
-        self.softmax(self.linear_after_gated_tanh_attention(gated_tanh_attention))
+        img_features_weights = self.softmax(self.linear_after_gated_tanh_attention(gated_tanh_attention))
 
-        # TODO write: multiply softmax by image features
-        attention_img_features = None  # TODO
+        attention_img_features = torch.mul(img_features_weights, images_representation)
+        img_sum_weighted_features = torch.sum(attention_img_features, dim=1)
 
-        gated_tanh_question = torch.mul(self.tanh(self.linear_inside_tanh_question(questions_representation)),
-                                        self.sigmoid(self.linear_inside_sigmoid_question(questions_representation)))
+        gated_tanh_img = torch.mul(self.tanh(self.linear_inside_tanh_image(img_sum_weighted_features)),
+                                   self.sigmoid(self.linear_inside_sigmoid_image(img_sum_weighted_features)))
 
-        gated_tanh_img = torch.mul(self.tanh(self.linear_inside_tanh_image(attention_img_features)),
-                                   self.sigmoid(self.linear_inside_sigmoid_image(attention_img_features)))
+        gated_tanh_questions = torch.mul(self.tanh(self.linear_inside_tanh_question(questions_representation)),
+                                         self.sigmoid(self.linear_inside_sigmoid_question(questions_representation)))
 
-        pointwise_mul = torch.mul(gated_tanh_question, gated_tanh_img)
+        pointwise_mul = torch.mul(gated_tanh_img, gated_tanh_questions)
 
-        return self.fc()
+        gated_tanh_mul_product = torch.mul(self.tanh(self.linear_inside_tanh_last(pointwise_mul)),
+                                           self.sigmoid(self.linear_inside_sigmoid_last(pointwise_mul)))
+
+        return self.fc(gated_tanh_mul_product)
 
 
 def soft_scores_target(answers_batch, n_classes):
@@ -134,12 +129,12 @@ def soft_scores_target(answers_batch, n_classes):
     return idx_questions_without_answers, torch.stack(targets, dim=0)
 
 
-def evaluate(dataLoader, model, criterion, last_epoch_loss, vqa_val_dataset):
+def evaluate(dataloader, model, criterion, last_epoch_loss, vqa_val_dataset):
     print('============ Evaluating on validation set ============')
     with torch.no_grad():
         accuracy = 0
         val_epoch_losses = list()
-        for i_batch_ev, batch_ev in enumerate(dataLoader):
+        for i_batch_ev, batch_ev in enumerate(dataloader):
             if model.target_type == 'onehot':
                 # answers
                 answers_labels_batch__ev = [sample['answer']['label_counts'] for sample in batch_ev]
@@ -192,19 +187,14 @@ def main():
 
 
 # TODO:
-#  1. Choose a more simple CNN ??
+#  1. Choose a more simple CNN ??  [V]
 #   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
-#  2. BCEWithLogitsLoss and soft_scores_target()
+#  2. BCEWithLogitsLoss and soft_scores_target()  [V]
 #  3. Improve data read process (for speed) -
 #   - Word to index and target - create them in Dataset
 #  4. If continuing to fail - try 'ulimit' to fix the num_workers errors
 #  5. Architecture:
-#   - A) Gated tanh on each of the representations
-#        Multiplication
-#        Gated tanh on the multiplication
-#        Fully connected to #classes dim
-#        and then BCELossWithLogits
-#   - B) F.normalize(x, p=2, dim=1) image representations
+#   - F.normalize(x, p=2, dim=1) image representations ??
 #  6. optimizers:
 #    A) torch.optim.Adadelta - no need to adjust lr
 #    B) torch.optim.Adamax
@@ -222,6 +212,7 @@ if __name__ == '__main__':
     # p = pstats.Stats(PROFFILE)
     # p.sort_stats('tottime').print_stats(250)
     # main()
+
     # compute_targets()  TODO uncomment this
 
     running_on_linux = 'Linux' in platform.platform()
@@ -258,21 +249,23 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    batch_size = 128
+    batch_size = 128 if running_on_linux else 16
     num_workers = 12 if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
                                   collate_fn=lambda x: x, drop_last=False)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                 collate_fn=lambda x: x, drop_last=False)
 
-    word_embd_dim = 100
-    lstm_hidden_dim = 1280
-    LSTM_layers = 1
-    lstm_params_ = {'word_embd_dim': word_embd_dim, 'lstm_hidden_dim': lstm_hidden_dim, 'n_layers': LSTM_layers,
-                    'train_question_path': train_questions_json_path}
+    word_embd_dim = 300
+    img_feature_dim = 256
+    question_hidden_dim = 512
+    GRU_layers = 1
+    gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim, 'n_layers': GRU_layers,
+                   'train_question_path': train_questions_json_path}
 
-    target_type = 'sofscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
-    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, target_type=target_type)  # TODO add param
+    target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
+    model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
+                img_feature_dim=img_feature_dim)
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss()
@@ -287,19 +280,18 @@ if __name__ == '__main__':
     print(f'batch_size = {batch_size}\n'
           f'Device: {model.device}\n'
           f'word_embd_dim = {word_embd_dim}\n'
-          f'lstm_hidden_dim = {lstm_hidden_dim}\n'
-          f'LSTM_layers = {LSTM_layers}\n'
+          f'question_hidden_dim = {question_hidden_dim}\n'
+          f'GRU_layers = {GRU_layers}\n'
           f'initial_lr = {initial_lr}\n'
           f'patience = {patience}\n'
           f'target_type = {target_type}\n'
           f'num_workers = {num_workers}\n'
           f'Image model = {model.cnn._get_name()}\n'
-          f'Question model = {model.lstm._get_name()}\n'
-          f'Activation = {model.activation._get_name()}\n'
+          f'Question model = {model.gru._get_name()}\n'
           f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
-    epochs = 10
+    epochs = 20
     count_no_improvement = 0
     for epoch in range(epochs):
         train_epoch_losses = list()
@@ -338,15 +330,6 @@ if __name__ == '__main__':
                 print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_images)} '
                       f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_images = time.time()
-
-            # TODO this lines evaluate in the middle of the epoch - DELETE
-            # if i_batch and i_batch == int(len(train_dataloader) / 2):
-            #     # evaluate in the middle of epoch, if no improvement in val loss, reduce lr (lr = lr / 2)
-            #     _, reduce_lr, _ = evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
-            #     if reduce_lr:
-            #         print("========================== Reduce Learning Rate ==========================")
-            #         print(f"learning rate: {optimizer.param_groups[0]['lr']} > {optimizer.param_groups[0]['lr'] / 2}")
-            #         optimizer.param_groups[0]['lr'] /= 2
 
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
