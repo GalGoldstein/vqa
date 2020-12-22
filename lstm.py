@@ -44,7 +44,7 @@ class GRU(nn.Module):
         self.word_embedding = nn.Embedding.from_pretrained(word_vectors, freeze=False)
 
         self.encoder = nn.GRU(input_size=word_embd_dim, hidden_size=lstm_hidden_dim, num_layers=n_layers,
-                               batch_first=True)
+                              batch_first=True)
 
     @staticmethod
     def preprocess_question_string(question):
@@ -91,6 +91,7 @@ class GRU(nn.Module):
         word_embeddings = self.word_embedding(padded.long())
         output, _ = self.encoder(word_embeddings[None, ...])  # currently supporting only a single sentence
         return output[0][-1]  # return only last hidden state, of the last layer of LSTM
+
 
 class LSTM(nn.Module):
     def __init__(self, word_embd_dim, lstm_hidden_dim, n_layers, train_question_path):
@@ -171,7 +172,6 @@ if __name__ == "__main__":
 
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(gru.parameters())])
     print(f'============ # GRU Parameters: {n_params}============')
-
 
     lstm = LSTM(100, 1024, 2, 'data/v2_OpenEnded_mscoco_train2014_questions.json')
     out = lstm(lstm.words_to_idx(' '.join(lstm.preprocess_question_string('Where is he looking?'))))

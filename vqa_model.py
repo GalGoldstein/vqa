@@ -39,7 +39,8 @@ class VQA(nn.Module):
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         # self.cnn = cnn.Xception().to(self.device)
-        self.cnn = cnn.MobileNetV2().to(self.device)
+        # self.cnn = cnn.MobileNetV2().to(self.device)
+        self.cnn = cnn.CNN().to(self.device)
 
         self.lstm = lstm.LSTM(lstm_params['word_embd_dim'],
                               lstm_params['lstm_hidden_dim'],
@@ -113,8 +114,6 @@ class VQA(nn.Module):
                                    self.sigmoid(self.linear_inside_sigmoid_image(attention_img_features)))
 
         pointwise_mul = torch.mul(gated_tanh_question, gated_tanh_img)
-
-
 
         return self.fc()
 
