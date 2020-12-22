@@ -82,6 +82,21 @@ class VQA(nn.Module):
 
         return torch.tensor(all_answers)
 
+    def answers_to_softscore(self, answers_batch, n_classes):
+        idx_questions_without_answers = list()
+        targets = []
+        soft_scores = [{k: v for k, v in zip(sample['labels'], sample['scores'])} for sample in answers_batch]
+        for i, soft_score_dict in enumerate(soft_scores):
+            if soft_score_dict:
+                target = torch.zeros(n_classes)
+                for label, score in soft_score_dict.items():
+                    target[label] = score
+                targets.append(target)
+            else:
+                idx_questions_without_answers.append(i)
+
+        return idx_questions_without_answers, torch.stack(targets, dim=0).to(self.device)
+
     def forward(self, images_batch, questions_batch):
         # images_representation should be [batch , k , d] where k = number features of image, d = dim of every feature
         images_representation = self.cnn(images_batch)
@@ -114,22 +129,6 @@ class VQA(nn.Module):
         return self.fc(gated_tanh_mul_product)
 
 
-def soft_scores_target(answers_batch, n_classes):
-    idx_questions_without_answers = list()
-    targets = []
-    soft_scores = [{k: v for k, v in zip(sample['labels'], sample['scores'])} for sample in answers_batch]
-    for i, soft_score_dict in enumerate(soft_scores):
-        if soft_score_dict:
-            target = torch.zeros(n_classes)
-            for label, score in soft_score_dict.items():
-                target[label] = score
-            targets.append(target)
-        else:
-            idx_questions_without_answers.append(i)
-
-    return idx_questions_without_answers, torch.stack(targets, dim=0)
-
-
 def evaluate(dataloader, model, criterion, last_epoch_loss, vqa_val_dataset):
     print('============ Evaluating on validation set ============')
     with torch.no_grad():
@@ -146,7 +145,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, vqa_val_dataset):
                 target_ev = target_ev[target_ev != model.num_classes]
             else:  # target_type='softscore'
                 answers_ev = [sample['answer'] for sample in batch_ev]
-                idx_questions_without_answers_ev, target_ev = soft_scores_target(answers_ev, model.num_classes)
+                idx_questions_without_answers_ev, target_ev = model.answers_to_softscore(answers_ev, model.num_classes)
 
             # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch__ev = torch.stack([sample['image'] for idx, sample in enumerate(batch_ev)
@@ -310,7 +309,7 @@ if __name__ == '__main__':
                 target = target[target != model.num_classes]
             else:  # target_type='softscore'
                 answers = [sample['answer'] for sample in batch]
-                idx_questions_without_answers, target = soft_scores_target(answers, model.num_classes)
+                idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
 
             # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch_ = torch.stack([sample['image'] for idx, sample in enumerate(batch)
