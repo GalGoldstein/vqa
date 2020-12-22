@@ -256,7 +256,7 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                 collate_fn=lambda x: x, drop_last=False)
 
-    word_embd_dim = 200
+    word_embd_dim = 100
     img_feature_dim = 256
     question_hidden_dim = 512
     GRU_layers = 1
