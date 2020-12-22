@@ -21,6 +21,7 @@ if 'Linux' in platform.platform():
     rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
 
+
 # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
 # torch.multiprocessing.set_sharing_strategy('file_system') # TODO maybe delete?
 
@@ -140,6 +141,40 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss, vqa_val_dataset):
 
 
 def main():
+    pass
+
+
+# TODO:
+#  1. Choose a more simple CNN ??
+#   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
+#  2. BCEWithLogitsLoss and soft_scores_target()
+#  3. Improve data read process (for speed) -
+#   - Word to index and target - create them in Dataset
+#  4. If continuing to fail - try 'ulimit' to fix the num_workers errors
+#  5. Architecture:
+#   - A) Gated tanh on each of the representations
+#        Multiplication
+#        Gated tanh on the multiplication
+#        Fully connected to #classes dim
+#        and then BCELossWithLogits
+#   - B) F.normalize(x, p=2, dim=1) image representations
+#  6. optimizers:
+#    A) torch.optim.Adadelta - no need to adjust lr
+#    B) torch.optim.Adamax
+#  7. Reduce lr to 0.001 as a first try  [V]
+#  8. Increase batch size significantly >> 384 ? [V] could make it with 128, maybe can go bit bigger
+# nohup python -u vqa_model.py > 1.out&
+
+if __name__ == '__main__':
+    # import cProfile
+    #
+    # PROFFILE = 'prof.profile'
+    # cProfile.run('main()', PROFFILE)
+    # import pstats
+    #
+    # p = pstats.Stats(PROFFILE)
+    # p.sort_stats('tottime').print_stats(250)
+    # main()
     # compute_targets()  TODO uncomment this
 
     running_on_linux = 'Linux' in platform.platform()
@@ -179,9 +214,9 @@ def main():
     batch_size = 128
     num_workers = 12 if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                  collate_fn=lambda x: x)
+                                  collate_fn=lambda x: x, drop_last=False)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                collate_fn=lambda x: x)
+                                collate_fn=lambda x: x, drop_last=False)
 
     word_embd_dim = 100
     lstm_hidden_dim = 1280
@@ -287,36 +322,3 @@ def main():
         if count_no_improvement >= patience:
             print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
             break
-
-
-# TODO:
-#  1. Choose a more simple CNN ??
-#   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
-#  2. BCEWithLogitsLoss and soft_scores_target()
-#  3. Improve data read process (for speed) -
-#   - Word to index and target - create them in Dataset
-#  4. If continuing to fail - try 'ulimit' to fix the num_workers errors
-#  5. Architecture:
-#   - A) Gated tanh on each of the representations
-#        Multiplication
-#        Gated tanh on the multiplication
-#        Fully connected to #classes dim
-#        and then BCELossWithLogits
-#   - B) F.normalize(x, p=2, dim=1) image representations
-#  6. optimizers:
-#    A) torch.optim.Adadelta - no need to adjust lr
-#    B) torch.optim.Adamax
-#  7. Reduce lr to 0.001 as a first try  [V]
-#  8. Increase batch size significantly >> 384 ? [V]
-# nohup python -u vqa_model.py > 1.out&
-
-if __name__ == '__main__':
-    # import cProfile
-    #
-    # PROFFILE = 'prof.profile'
-    # cProfile.run('main()', PROFFILE)
-    # import pstats
-    #
-    # p = pstats.Stats(PROFFILE)
-    # p.sort_stats('tottime').print_stats(250)
-    main()
