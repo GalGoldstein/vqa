@@ -32,7 +32,7 @@ if 'Linux' in platform.platform():
 #  gated tanh
 
 class VQA(nn.Module):
-    def __init__(self, lstm_params, label2ans_path, fc_size, target_type, img_feature_dim):
+    def __init__(self, lstm_params, label2ans_path, target_type, img_feature_dim):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -69,9 +69,11 @@ class VQA(nn.Module):
         self.linear_inside_sigmoid_image = nn.Linear(img_feature_dim, 512)
 
         # gated tanh last
-        self.linear_inside_tanh_last = None
+        self.linear_inside_tanh_last = nn.Linear(512, 512)
+        self.linear_inside_sigmoid_last = nn.Linear(512, 512)
 
-        self.fc = nn.Linear(fc_size, self.num_classes)
+        # last linear fully connected
+        self.fc = nn.Linear(512, self.num_classes, bias=False)
 
     def answers_to_one_hot(self, answers_labels_batch):
         """
@@ -112,7 +114,9 @@ class VQA(nn.Module):
 
         pointwise_mul = torch.mul(gated_tanh_question, gated_tanh_img)
 
-        return self.fc(self.activation(pointwise_mul))
+
+
+        return self.fc()
 
 
 def soft_scores_target(answers_batch, n_classes):
@@ -268,9 +272,8 @@ if __name__ == '__main__':
     lstm_params_ = {'word_embd_dim': word_embd_dim, 'lstm_hidden_dim': lstm_hidden_dim, 'n_layers': LSTM_layers,
                     'train_question_path': train_questions_json_path}
 
-    fc_size = 512
-    target_type = 'onehot'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
-    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, fc_size=fc_size, target_type=target_type)
+    target_type = 'sofscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
+    model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, target_type=target_type)  # TODO add param
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss()
@@ -287,7 +290,6 @@ if __name__ == '__main__':
           f'word_embd_dim = {word_embd_dim}\n'
           f'lstm_hidden_dim = {lstm_hidden_dim}\n'
           f'LSTM_layers = {LSTM_layers}\n'
-          f'VQA fc_size = {fc_size}\n'
           f'initial_lr = {initial_lr}\n'
           f'patience = {patience}\n'
           f'target_type = {target_type}\n'
