@@ -115,14 +115,15 @@ class VQADataset(Dataset):
             image_id = str(question_dict['image_id']).zfill(12)
             image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.jpg')
 
-            try:  # full path to image
-                image_tensor = self.load_img_from_path(image_path)
+            for i in range(10):
+                try:  # full path to image
+                    image_tensor = self.load_img_from_path(image_path)
+                    break
 
-            except:
-                print(f'Failed in __getitem__ ... trying to load again\n'
-                      f'image path: {image_path}')
-                time.sleep(1)
-                image_tensor = self.load_img_from_path(image_path)
+                except:
+                    print(f'Failed in __getitem__ ... trying to load again\n'
+                          f'image path: {image_path}')
+                    time.sleep(3)
 
         return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
 
