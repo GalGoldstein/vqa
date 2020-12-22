@@ -49,7 +49,7 @@ class LSTM(nn.Module):
     @staticmethod
     def preprocess_question_string(question):
         """
-            1. only numbers and letters
+            1. only numbers and letters (remove punctuation)
             2. lower all except first word first letter
             3. any word with number >> <number>
         """

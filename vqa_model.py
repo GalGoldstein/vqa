@@ -28,10 +28,11 @@ if 'Linux' in platform.platform():
 
 # TODO - Change architecture:
 #  LSTM >> GRU []
+#  CNN: MobileNetV2 >> simple net
 #  gated tanh
 
 class VQA(nn.Module):
-    def __init__(self, lstm_params, label2ans_path, fc_size, target_type):
+    def __init__(self, lstm_params, label2ans_path, fc_size, target_type, img_feature_dim):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -48,7 +49,28 @@ class VQA(nn.Module):
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
         self.target_type = target_type
-        self.activation = nn.ReLU()
+
+        self.tanh = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
+        self.softmax = nn.Softmax()  # TODO dim?
+
+        # gated tanh activation before attention
+        self.linear_inside_tanh_attention = nn.Linear(img_feature_dim + lstm_params['lstm_hidden_dim'], 512)
+        self.linear_inside_sigmoid_attention = nn.Linear(img_feature_dim + lstm_params['lstm_hidden_dim'], 512)
+        # linear layer after gated tanh activation before attention
+        self.linear_after_gated_tanh_attention = nn.Linear(512, 1, bias=False)
+
+        # gated tanh activation hidden representation of question
+        self.linear_inside_tanh_question = nn.Linear(lstm_params['lstm_hidden_dim'], 512)
+        self.linear_inside_sigmoid_question = nn.Linear(lstm_params['lstm_hidden_dim'], 512)
+
+        # gated tanh activation hidden representation of image
+        self.linear_inside_tanh_image = nn.Linear(img_feature_dim, 512)
+        self.linear_inside_sigmoid_image = nn.Linear(img_feature_dim, 512)
+
+        # gated tanh last
+        self.linear_inside_tanh_last = None
+
         self.fc = nn.Linear(fc_size, self.num_classes)
 
     def answers_to_one_hot(self, answers_labels_batch):
@@ -66,11 +88,29 @@ class VQA(nn.Module):
         return torch.tensor(all_answers)
 
     def forward(self, images_batch, questions_batch):
+        # images_representation should be [batch , k , d]
         images_representation = self.cnn(images_batch)
         questions_last_hidden = [self.lstm(self.lstm.words_to_idx(question)) for question in questions_batch]
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
-        pointwise_mul = torch.mul(images_representation, questions_representation)
+        # TODO write: concat the image and the question hideen dim
+        concat = None  # TODO size = [batch, k, d + 512]  512 for hidden dim of LSTM / GRU
+        gated_tanh_attention = torch.mul(self.tanh(self.linear_inside_tanh_attention(concat)),
+                                         self.sigmoid(self.linear_inside_sigmoid_attention(concat)))
+
+        # TODO write: softmax
+        self.softmax(self.linear_after_gated_tanh_attention(gated_tanh_attention))
+
+        # TODO write: multiply softmax by image features
+        attention_img_features = None  # TODO
+
+        gated_tanh_question = torch.mul(self.tanh(self.linear_inside_tanh_question(questions_representation)),
+                                        self.sigmoid(self.linear_inside_sigmoid_question(questions_representation)))
+
+        gated_tanh_img = torch.mul(self.tanh(self.linear_inside_tanh_image(attention_img_features)),
+                                   self.sigmoid(self.linear_inside_sigmoid_image(attention_img_features)))
+
+        pointwise_mul = torch.mul(gated_tanh_question, gated_tanh_img)
 
         return self.fc(self.activation(pointwise_mul))
 
@@ -228,7 +268,7 @@ if __name__ == '__main__':
     lstm_params_ = {'word_embd_dim': word_embd_dim, 'lstm_hidden_dim': lstm_hidden_dim, 'n_layers': LSTM_layers,
                     'train_question_path': train_questions_json_path}
 
-    fc_size = 1280
+    fc_size = 512
     target_type = 'onehot'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
     model = VQA(lstm_params=lstm_params_, label2ans_path=label2ans_path_, fc_size=fc_size, target_type=target_type)
     model = model.to(model.device)
