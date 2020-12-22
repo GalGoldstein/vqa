@@ -18,13 +18,17 @@ import time
 if 'Linux' in platform.platform():
     import resource
 
+    # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
     rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
+    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))  # TODO increase if any problems
 
 
 # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
 # torch.multiprocessing.set_sharing_strategy('file_system') # TODO maybe delete?
 
+# TODO - Change architecture:
+#  LSTM >> GRU []
+#  gated tanh
 
 class VQA(nn.Module):
     def __init__(self, lstm_params, label2ans_path, fc_size, target_type):
