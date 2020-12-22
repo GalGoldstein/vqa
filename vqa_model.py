@@ -15,7 +15,14 @@ import pickle
 import platform
 import time
 
-torch.cuda.empty_cache()
+if 'Linux' in platform.platform():
+    import resource
+
+    rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
+
+# from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
+# torch.multiprocessing.set_sharing_strategy('file_system') # TODO maybe delete?
 
 
 class VQA(nn.Module):
@@ -134,9 +141,6 @@ def evaluate(dataLoader, model, criterion, last_epoch_loss, vqa_val_dataset):
 
 def main():
     # compute_targets()  TODO uncomment this
-
-    # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
-    torch.multiprocessing.set_sharing_strategy('file_system')
 
     running_on_linux = 'Linux' in platform.platform()
 
