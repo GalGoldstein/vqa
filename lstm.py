@@ -51,7 +51,7 @@ class GRU(nn.Module):
         """
             1. only numbers and letters
             2. lower all except first word first letter
-            3. any word with number >> <number>
+            3. any word with number higher than 10 >> <number>. any word with number lower to 10: e.g. 9 >>'nine'
         """
         result = question[0].upper() + question[1:].lower()
         # changing 0,1,...,10 to the name of the number e.g. ten >> 10
