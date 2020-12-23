@@ -270,7 +270,7 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss()
     # initial_lr = None
     patience = 4  # how many epochs without val loss improvement to stop training
-    optimizer = optim.Adamax(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer?
+    optimizer = optim.Adam(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer?
 
     print('============ Starting training ============')
     # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
@@ -322,12 +322,24 @@ if __name__ == '__main__':
             output = model(images_batch_, questions_batch_)
             loss = criterion(output, target)
             loss.backward()
+
+            # TODO maybe we have vanishing gradients
+            for name, param in model.named_parameters():
+                try:
+                    print(name, param.grad.norm())
+                except:
+                    print(name, "has no grad")
+
+            # TODO if exploding gradients:
+            # nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25)
+
             train_epoch_losses.append(float(loss))
             optimizer.step()
 
             if i_batch and i_batch % int(1000 / batch_size) == 0:
-                print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)} '
-                      f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
+                print(
+                    f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)} '
+                    f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_questions = time.time()
 
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
