@@ -131,6 +131,7 @@ class VQA(nn.Module):
 
 def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
     print(f"============ Evaluating on {'validation' if dataset.phase == 'val' else 'train'} set ============")
+    model.eval()
     with torch.no_grad():
         accuracy = 0
         epoch_losses = list()
@@ -163,7 +164,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
             pred = torch.argmax(output, dim=1)
             scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
-                      for sample in batch]
+                      for idx, sample in enumerate(batch) if idx not in idx_questions_without_answers]
 
             for i, prediction in enumerate(pred):
                 sample_score = scores[i]
@@ -245,7 +246,7 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    batch_size = 100 if running_on_linux else 16
+    batch_size = 100 if running_on_linux else 96
     num_workers = 12 if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
                                   collate_fn=lambda x: x, drop_last=False)
@@ -259,27 +260,27 @@ if __name__ == '__main__':
     gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim, 'n_layers': GRU_layers,
                    'train_question_path': train_questions_json_path}
 
+    # TODO target_type?
     target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
     model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
                 img_feature_dim=img_feature_dim)
     model = model.to(model.device)
 
-    # TODO reduction
+    # TODO reduction?
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
-    initial_lr = 0.001
-    patience = 2  # how many epochs without val loss improvement to stop training
-    optimizer = optim.Adam(model.parameters(), lr=initial_lr)  # TODO weight_decay?
+    # initial_lr = None
+    patience = 4  # how many epochs without val loss improvement to stop training
+    optimizer = optim.Adam(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer?
 
     print('============ Starting training ============')
-    n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
-    print(f'============ # Parameters: {n_params}============')
+    # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
+    # print(f'============ # Parameters: {n_params}============')
 
     print(f'batch_size = {batch_size}\n'
           f'Device: {model.device}\n'
           f'word_embd_dim = {word_embd_dim}\n'
           f'question_hidden_dim = {question_hidden_dim}\n'
           f'GRU_layers = {GRU_layers}\n'
-          f'initial_lr = {initial_lr}\n'
           f'patience = {patience}\n'
           f'target_type = {target_type}\n'
           f'num_workers = {num_workers}\n'
@@ -288,12 +289,13 @@ if __name__ == '__main__':
           f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
-    epochs = 20
+    epochs = 100
     count_no_improvement = 0
     for epoch in range(epochs):
         train_epoch_losses = list()
         epoch_start_time = time.time()
         timer_images = time.time()
+        model.train()
         for i_batch, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
             if model.target_type == 'onehot':
@@ -332,18 +334,20 @@ if __name__ == '__main__':
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
         cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-            evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+            evaluate(train_dataloader, model, criterion, last_epoch_loss, vqa_train_dataset)
+        # evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
-        if val_loss_didnt_improve:
-            count_no_improvement += 1
-            print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
-        else:
-            count_no_improvement = 0
-
-        print(f"============ Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ==========")
-        torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
-
-        last_epoch_loss = cur_epoch_loss
-        if count_no_improvement >= patience:
-            print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
-            break
+        # TODO uncomment:
+        # if val_loss_didnt_improve:
+        #     count_no_improvement += 1
+        #     print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
+        # else:
+        #     count_no_improvement = 0
+        #
+        # print(f"============ Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ==========")
+        # torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
+        #
+        # last_epoch_loss = cur_epoch_loss
+        # if count_no_improvement >= patience:
+        #     print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
+        #     break

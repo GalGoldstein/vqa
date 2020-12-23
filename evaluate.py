@@ -38,17 +38,17 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-    batch_size = 100 if running_on_linux else 16
+    batch_size = 100 if running_on_linux else 96
     num_workers = 12 if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
                                   collate_fn=lambda x: x, drop_last=False)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                 collate_fn=lambda x: x, drop_last=False)
 
-    weights_path = 'weights/vqa_model_epoch_6_val_acc=0.24086_reduction=mean.pth'
+    weights_path = 'weights/vqa_model_epoch_50_val_acc=0.27048.pth'
     model = torch.load(weights_path)
 
-    # TODO reduction
+    # TODO reduction?
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
-    evaluate(val_dataloader, model, criterion, np.inf, vqa_val_dataset)
+    # evaluate(val_dataloader, model, criterion, np.inf, vqa_val_dataset)
     evaluate(train_dataloader, model, criterion, np.inf, vqa_train_dataset)
