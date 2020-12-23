@@ -168,8 +168,10 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
             for i, prediction in enumerate(pred):
                 sample_score = scores[i]
-                if int(prediction) in sample_score:
-                    accuracy += sample_score[int(prediction)]
+                accuracy += max(sample_score.values())
+                # TODO uncomment delete one above
+                # if int(prediction) in sample_score:
+                #     accuracy += sample_score[int(prediction)]
 
         acc = accuracy / len(dataset)
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
@@ -335,6 +337,7 @@ if __name__ == '__main__':
 
         cur_epoch_loss, val_loss_didnt_improve, val_acc = \
             evaluate(train_dataloader, model, criterion, last_epoch_loss, vqa_train_dataset)
+        # TODO uncomment delete one above
         # evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
         # TODO uncomment:
