@@ -168,10 +168,8 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
             for i, prediction in enumerate(pred):
                 sample_score = scores[i]
-                accuracy += max(sample_score.values())
-                # TODO uncomment delete one above
-                # if int(prediction) in sample_score:
-                #     accuracy += sample_score[int(prediction)]
+                if int(prediction) in sample_score:
+                    accuracy += sample_score[int(prediction)]
 
         acc = accuracy / len(dataset)
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
@@ -263,7 +261,7 @@ if __name__ == '__main__':
                    'train_question_path': train_questions_json_path}
 
     # TODO target_type?
-    target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
+    target_type = 'onehot'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
     model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
                 img_feature_dim=img_feature_dim)
     model = model.to(model.device)
