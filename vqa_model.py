@@ -159,7 +159,6 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
                                if idx not in idx_questions_without_answers]
 
             output = model(images_batch, questions_batch)
-
             loss = criterion(output, target)
             epoch_losses.append(float(loss))
 
@@ -168,7 +167,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
                       for idx, sample in enumerate(batch) if idx not in idx_questions_without_answers]
 
             for i, prediction in enumerate(pred):
-                sample_score = scores[i]
+                sample_score = scores[i]  # {label: score} dict
                 if int(prediction) in sample_score:
                     accuracy += sample_score[int(prediction)]
 
@@ -290,7 +289,7 @@ if __name__ == '__main__':
           f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
-    epochs = 100
+    epochs = 100  # TODO change back
     count_no_improvement = 0
     for epoch in range(epochs):
         train_epoch_losses = list()
