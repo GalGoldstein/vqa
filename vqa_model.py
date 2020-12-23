@@ -98,7 +98,7 @@ class VQA(nn.Module):
         return idx_questions_without_answers, torch.stack(targets, dim=0).to(self.device)
 
     def forward(self, images_batch, questions_batch):
-        # images_representation should be [batch , k , d] where k = number features of image, d = dim of every feature
+        # images_representation shape [batch , k , d] where k = number features of image, d = dim of every feature
         images_representation = self.cnn(images_batch)
         questions_last_hidden = [self.gru(self.gru.words_to_idx(question)) for question in questions_batch]
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
@@ -129,57 +129,57 @@ class VQA(nn.Module):
         return self.fc(gated_tanh_mul_product)
 
 
-def evaluate(dataloader, model, criterion, last_epoch_loss, vqa_val_dataset):
-    print('============ Evaluating on validation set ============')
+def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
+    print(f"============ Evaluating on {'validation' if dataset.phase == 'val' else 'train'} set ============")
     with torch.no_grad():
         accuracy = 0
-        val_epoch_losses = list()
-        for i_batch_ev, batch_ev in enumerate(dataloader):
+        epoch_losses = list()
+        for i_batch, batch in enumerate(dataloader):
             if model.target_type == 'onehot':
                 # answers
-                answers_labels_batch__ev = [sample['answer']['label_counts'] for sample in batch_ev]
-                target_ev = model.answers_to_one_hot(answers_labels_batch__ev).to(model.device)
+                answers_labels_batch = [sample['answer']['label_counts'] for sample in batch]
+                target = model.answers_to_one_hot(answers_labels_batch).to(model.device)
 
                 # don't learn from questions without answers
-                idx_questions_without_answers_ev = torch.nonzero(target_ev == model.num_classes, as_tuple=False)
-                target_ev = target_ev[target_ev != model.num_classes]
+                idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
+                target = target[target != model.num_classes]
             else:  # target_type='softscore'
-                answers_ev = [sample['answer'] for sample in batch_ev]
-                idx_questions_without_answers_ev, target_ev = model.answers_to_softscore(answers_ev, model.num_classes)
+                answers = [sample['answer'] for sample in batch]
+                idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
 
             # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
-            images_batch__ev = torch.stack([sample['image'] for idx, sample in enumerate(batch_ev)
-                                            if idx not in idx_questions_without_answers_ev], dim=0).to(model.device)
+            images_batch = torch.stack([sample['image'] for idx, sample in enumerate(batch)
+                                        if idx not in idx_questions_without_answers], dim=0).to(model.device)
 
             # questions
             # Natural language e.g. questions_batch_ = ['How many dogs?'...]
-            questions_batch__ev = [sample['question'] for idx, sample in enumerate(batch_ev)
-                                   if idx not in idx_questions_without_answers_ev]
+            questions_batch = [sample['question'] for idx, sample in enumerate(batch)
+                               if idx not in idx_questions_without_answers]
 
-            output_ev = model(images_batch__ev, questions_batch__ev)
+            output = model(images_batch, questions_batch)
 
-            loss_ev = criterion(output_ev, target_ev)
-            val_epoch_losses.append(float(loss_ev))
+            loss = criterion(output, target)
+            epoch_losses.append(float(loss))
 
-            pred = torch.argmax(output_ev, dim=1)
+            pred = torch.argmax(output, dim=1)
             scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
-                      for sample in batch_ev]
+                      for sample in batch]
 
             for i, prediction in enumerate(pred):
                 sample_score = scores[i]
                 if int(prediction) in sample_score:
                     accuracy += sample_score[int(prediction)]
 
-        val_acc = accuracy / len(vqa_val_dataset)
-        print(f'Validation accuracy = {round(val_acc, 5)}')
-        cur_epoch_loss_ev = float(np.mean(val_epoch_losses))
-        print(f'Validation loss = {round(cur_epoch_loss_ev, 5)}')
-        if cur_epoch_loss_ev < last_epoch_loss:
+        acc = accuracy / len(dataset)
+        print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
+        cur_epoch_loss = float(np.mean(epoch_losses))
+        print(f"{'Validation' if dataset.phase == 'val' else 'Train'} loss = {round(cur_epoch_loss, 5)}")
+        if cur_epoch_loss < last_epoch_loss:
             loss_not_improved = False
         else:
             loss_not_improved = True
 
-        return cur_epoch_loss_ev, loss_not_improved, val_acc
+        return cur_epoch_loss, loss_not_improved, acc
 
 
 def main():
@@ -221,12 +221,10 @@ if __name__ == '__main__':
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/datashare',
-                                       force_read=False,
                                        phase='train')
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/datashare',
-                                     force_read=False,
                                      phase='val')
 
         train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'
@@ -237,13 +235,11 @@ if __name__ == '__main__':
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='data/images',
-                                       force_read=False,
                                        phase='train')
 
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='data/images',
-                                     force_read=False,
                                      phase='val')
         train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
@@ -268,10 +264,11 @@ if __name__ == '__main__':
                 img_feature_dim=img_feature_dim)
     model = model.to(model.device)
 
-    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss()
+    # TODO reduction
+    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     initial_lr = 0.001
     patience = 2  # how many epochs without val loss improvement to stop training
-    optimizer = optim.Adam(model.parameters(), lr=initial_lr)
+    optimizer = optim.Adam(model.parameters(), lr=initial_lr)  # TODO weight_decay?
 
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
