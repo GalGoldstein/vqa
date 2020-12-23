@@ -261,7 +261,7 @@ if __name__ == '__main__':
                    'train_question_path': train_questions_json_path}
 
     # TODO target_type?
-    target_type = 'onehot'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
+    target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
     model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
                 img_feature_dim=img_feature_dim)
     model = model.to(model.device)
@@ -270,7 +270,7 @@ if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     # initial_lr = None
     patience = 4  # how many epochs without val loss improvement to stop training
-    optimizer = optim.Adam(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer?
+    optimizer = optim.Adamax(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer?
 
     print('============ Starting training ============')
     # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
@@ -294,7 +294,7 @@ if __name__ == '__main__':
     for epoch in range(epochs):
         train_epoch_losses = list()
         epoch_start_time = time.time()
-        timer_images = time.time()
+        timer_questions = time.time()
         model.train()
         for i_batch, batch in enumerate(train_dataloader):
             optimizer.zero_grad()
@@ -326,9 +326,9 @@ if __name__ == '__main__':
             optimizer.step()
 
             if i_batch and i_batch % int(1000 / batch_size) == 0:
-                print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_images)} '
+                print(f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)} '
                       f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
-                timer_images = time.time()
+                timer_questions = time.time()
 
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
