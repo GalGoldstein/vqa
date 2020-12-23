@@ -356,6 +356,11 @@ https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
+
+        running_on_linux = 'Linux' in platform.platform()
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+
         self.convolutions = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
             nn.Conv2d(16, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
