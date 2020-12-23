@@ -49,6 +49,6 @@ if __name__ == '__main__':
     model = torch.load(weights_path)
 
     # TODO reduction?
-    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
+    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss()
     # evaluate(val_dataloader, model, criterion, np.inf, vqa_val_dataset)
     evaluate(train_dataloader, model, criterion, np.inf, vqa_train_dataset)

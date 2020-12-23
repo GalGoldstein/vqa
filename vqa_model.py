@@ -267,7 +267,7 @@ if __name__ == '__main__':
     model = model.to(model.device)
 
     # TODO reduction?
-    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
+    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss()
     # initial_lr = None
     patience = 4  # how many epochs without val loss improvement to stop training
     optimizer = optim.Adamax(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer?
