@@ -36,6 +36,7 @@ class VQA(nn.Module):
 
         self.cnn = cnn.CNN().to(self.device)
 
+        #  TODO maybe go back to LSTM?
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
                            gru_params['train_question_path']).to(self.device)
 
@@ -267,7 +268,7 @@ if __name__ == '__main__':
     model = model.to(model.device)
 
     # TODO reduction?
-    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss()
+    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     # initial_lr = None
     patience = 4  # how many epochs without val loss improvement to stop training
     optimizer = optim.Adam(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer?
