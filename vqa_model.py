@@ -44,27 +44,22 @@ class VQA(nn.Module):
         self.num_classes = len(self.lbl2ans)
         self.target_type = target_type
 
-        self.tanh = nn.Tanh()
-        self.sigmoid = nn.Sigmoid()
         self.softmax = nn.Softmax(dim=1)
+        self.relu = nn.ReLU()
 
-        # gated tanh activation before attention
-        self.linear_inside_tanh_attention = nn.Linear(img_feature_dim + gru_params['question_hidden_dim'], 512)
-        self.linear_inside_sigmoid_attention = nn.Linear(img_feature_dim + gru_params['question_hidden_dim'], 512)
-        # linear layer after gated tanh activation before attention
-        self.linear_after_gated_tanh_attention = nn.Linear(512, 1, bias=False)
+        # relu activation before attention
+        self.linear_inside_relu_attention = nn.Linear(img_feature_dim + gru_params['question_hidden_dim'], 512)
+        # linear layer after relu activation before attention
+        self.linear_after_relu_attention = nn.Linear(512, 1, bias=False)
 
-        # gated tanh activation hidden representation of question
-        self.linear_inside_tanh_question = nn.Linear(gru_params['question_hidden_dim'], 512)
-        self.linear_inside_sigmoid_question = nn.Linear(gru_params['question_hidden_dim'], 512)
+        # relu activation hidden representation of image
+        self.linear_inside_relu_image = nn.Linear(img_feature_dim, 512)
 
-        # gated tanh activation hidden representation of image
-        self.linear_inside_tanh_image = nn.Linear(img_feature_dim, 512)
-        self.linear_inside_sigmoid_image = nn.Linear(img_feature_dim, 512)
+        # relu activation hidden representation of question
+        self.linear_inside_relu_question = nn.Linear(gru_params['question_hidden_dim'], 512)
 
-        # gated tanh last
-        self.linear_inside_tanh_last = nn.Linear(512, 512)
-        self.linear_inside_sigmoid_last = nn.Linear(512, 512)
+        # relu activation last
+        self.linear_inside_relu_last = nn.Linear(512, 512)
 
         # last linear fully connected
         self.fc = nn.Linear(512, self.num_classes, bias=False)
@@ -108,26 +103,22 @@ class VQA(nn.Module):
                       questions_representation.shape[0],
                       questions_representation.shape[1]]
         concat = torch.cat((images_representation, questions_representation.expand(expand_dim).permute(1, 0, 2)), dim=2)
-        gated_tanh_attention = torch.mul(self.tanh(self.linear_inside_tanh_attention(concat)),
-                                         self.sigmoid(self.linear_inside_sigmoid_attention(concat)))
+        relu_attention = self.relu(self.linear_inside_relu_attention(concat))
 
-        img_features_weights = self.softmax(self.linear_after_gated_tanh_attention(gated_tanh_attention))
+        img_features_weights = self.softmax(self.linear_after_relu_attention(relu_attention))
 
         attention_img_features = torch.mul(img_features_weights, images_representation)
         img_sum_weighted_features = torch.sum(attention_img_features, dim=1)
 
-        gated_tanh_img = torch.mul(self.tanh(self.linear_inside_tanh_image(img_sum_weighted_features)),
-                                   self.sigmoid(self.linear_inside_sigmoid_image(img_sum_weighted_features)))
+        relu_imgs = self.relu(self.linear_inside_relu_image(img_sum_weighted_features))
 
-        gated_tanh_questions = torch.mul(self.tanh(self.linear_inside_tanh_question(questions_representation)),
-                                         self.sigmoid(self.linear_inside_sigmoid_question(questions_representation)))
+        relu_questions = self.relu(self.linear_inside_relu_question(questions_representation))
 
-        pointwise_mul = torch.mul(gated_tanh_img, gated_tanh_questions)
+        pointwise_mul = torch.mul(relu_imgs, relu_questions)
 
-        gated_tanh_mul_product = torch.mul(self.tanh(self.linear_inside_tanh_last(pointwise_mul)),
-                                           self.sigmoid(self.linear_inside_sigmoid_last(pointwise_mul)))
+        relu_mul_product = self.relu(self.linear_inside_relu_last(pointwise_mul))
 
-        return self.fc(gated_tanh_mul_product)
+        return self.fc(relu_mul_product)
 
 
 def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
@@ -260,7 +251,6 @@ if __name__ == '__main__':
     gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim, 'n_layers': GRU_layers,
                    'train_question_path': train_questions_json_path}
 
-    # TODO target_type?
     target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
     model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
                 img_feature_dim=img_feature_dim)
@@ -269,12 +259,12 @@ if __name__ == '__main__':
     # TODO reduction?
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     # initial_lr = None
-    patience = 4  # how many epochs without val loss improvement to stop training
-    optimizer = optim.Adam(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer?
+    patience = 14  # how many epochs without val loss improvement to stop training
+    optimizer = optim.Adam(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer? LRscheduler?
 
     print('============ Starting training ============')
-    # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
-    # print(f'============ # Parameters: {n_params}============')
+    n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
+    print(f'============ # Parameters: {n_params}============')
 
     print(f'batch_size = {batch_size}\n'
           f'Device: {model.device}\n'
@@ -289,7 +279,7 @@ if __name__ == '__main__':
           f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
-    epochs = 100  # TODO change back
+    epochs = 100
     count_no_improvement = 0
     for epoch in range(epochs):
         train_epoch_losses = list()
@@ -323,12 +313,13 @@ if __name__ == '__main__':
             loss = criterion(output, target)
             loss.backward()
 
-            # TODO we probably have vanishing gradients:
-            for name, param in model.named_parameters():
-                print(name, param.grad.norm())
+            # if exploding gradients:
+            # TODO max_norm? norm_type?
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25, norm_type=2)
 
-            # TODO if exploding gradients:
-            # nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25)
+            # printing gradients norms
+            # for name, param in model.named_parameters():
+            #     print(name, param.grad.norm())
 
             train_epoch_losses.append(float(loss))
             optimizer.step()
@@ -343,21 +334,18 @@ if __name__ == '__main__':
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
         cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-            evaluate(train_dataloader, model, criterion, last_epoch_loss, vqa_train_dataset)
-        # TODO uncomment delete one above
-        # evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+            evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
-        # TODO uncomment:
-        # if val_loss_didnt_improve:
-        #     count_no_improvement += 1
-        #     print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
-        # else:
-        #     count_no_improvement = 0
-        #
-        # print(f"============ Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ==========")
-        # torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
-        #
-        # last_epoch_loss = cur_epoch_loss
-        # if count_no_improvement >= patience:
-        #     print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
-        #     break
+        if val_loss_didnt_improve:
+            count_no_improvement += 1
+            print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
+        else:
+            count_no_improvement = 0
+
+        print(f"============ Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ==========")
+        torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
+
+        last_epoch_loss = cur_epoch_loss
+        if count_no_improvement >= patience:
+            print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
+            break

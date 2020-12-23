@@ -33,8 +33,8 @@ class VQADataset(Dataset):
             images_path: (str) path to dir containing 'train2014' and 'val2014' folders
             phase: (str) 'train' / 'val'
         """
-        self.target = pickle.load(open(target_pickle_path, "rb"))[:100]  # TODO
-        self.questions = json.load(open(questions_json_path))['questions'][:100]  # TODO
+        self.target = pickle.load(open(target_pickle_path, "rb"))
+        self.questions = json.load(open(questions_json_path))['questions']
         for question in self.questions:
             question['question'] = ' '.join(gru.GRU.preprocess_question_string(question['question']))
         self.img_path = images_path
