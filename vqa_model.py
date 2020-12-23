@@ -323,12 +323,9 @@ if __name__ == '__main__':
             loss = criterion(output, target)
             loss.backward()
 
-            # TODO maybe we have vanishing gradients
+            # TODO we probably have vanishing gradients:
             for name, param in model.named_parameters():
-                try:
-                    print(name, param.grad.norm())
-                except:
-                    print(name, "has no grad")
+                print(name, param.grad.norm())
 
             # TODO if exploding gradients:
             # nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25)
