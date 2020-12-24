@@ -194,6 +194,11 @@ def main():
 #   - Attention the question (how?)
 #  5. Improve data read process (for speed) -
 #   - Word to index and target - create them in Dataset
+#  Binary decision:
+#  {Dropout Yes (0.1?) or No,
+#  Weight normalization Yes or No,
+#  hidden=512 or 1024,
+#  Augmentations Yes or No}
 # nohup python -u vqa_model.py > 1.out&
 
 if __name__ == '__main__':

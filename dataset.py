@@ -119,11 +119,6 @@ class VQADataset(Dataset):
 #             image = TF.hflip(image)
 #             mask = TF.hflip(mask)
 #
-#         # Random vertical flipping
-#         if random.random() > 0.5:
-#             image = TF.vflip(image)
-#             mask = TF.vflip(mask)
-#
 #         # Transform to tensor
 #         image = TF.to_tensor(image)
 #         mask = TF.to_tensor(mask)
