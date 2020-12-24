@@ -34,7 +34,8 @@ class VQA(nn.Module):
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        self.cnn = cnn.CNN().to(self.device)
+        # self.cnn = cnn.CNN().to(self.device)  # TODO
+        self.cnn = cnn.CNNFilters().to(self.device)
 
         #  TODO maybe go back to LSTM?
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
@@ -179,19 +180,20 @@ def main():
 
 
 # TODO:
-#  1. Choose a more simple CNN ??  [V]
-#   https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
-#  2. BCEWithLogitsLoss and soft_scores_target()  [V]
-#  3. Improve data read process (for speed) -
-#   - Word to index and target - create them in Dataset
-#  4. If continuing to fail - try 'ulimit' to fix the num_workers errors
-#  5. Architecture:
+#  1. tricks:
+#   - Add weight normalization (bottom_up git)
+#   - Add dropout (bottom_up git)
 #   - F.normalize(x, p=2, dim=1) image representations ??
-#  6. optimizers:
+#  2. optimizers:
 #    A) torch.optim.Adadelta - no need to adjust lr
 #    B) torch.optim.Adamax
-#  7. Reduce lr to 0.001 as a first try  [V]
-#  8. Increase batch size significantly >> 384 ? [V] could make it with 128, maybe can go bit bigger
+#  3. More:
+#   - learning rate
+#   - batch size as big as possible
+#  4. Future:
+#   - Attention the question
+#  5. Improve data read process (for speed) -
+#   - Word to index and target - create them in Dataset
 # nohup python -u vqa_model.py > 1.out&
 
 if __name__ == '__main__':
@@ -205,7 +207,7 @@ if __name__ == '__main__':
     # p.sort_stats('tottime').print_stats(250)
     # main()
 
-    # compute_targets()  TODO uncomment this
+    # compute_targets()  # TODO uncomment
 
     running_on_linux = 'Linux' in platform.platform()
 
@@ -245,7 +247,7 @@ if __name__ == '__main__':
                                 collate_fn=lambda x: x, drop_last=False)
 
     word_embd_dim = 300
-    img_feature_dim = 256
+    img_feature_dim = 25  # TODO 25 for filters 256 for regions
     question_hidden_dim = 512
     GRU_layers = 1
     gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim, 'n_layers': GRU_layers,
@@ -349,3 +351,5 @@ if __name__ == '__main__':
         if count_no_improvement >= patience:
             print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
             break
+
+        torch.cuda.empty_cache()  # TODO might solve slowness

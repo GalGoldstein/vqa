@@ -387,7 +387,43 @@ class CNN(nn.Module):
         x = self.convolutions(x)
         x = x.permute(0, 2, 3, 1)  # [batch_size, 256, 5, 5] -> [batch_size, 5, 5, 256]
         x = x.reshape([x.size(0), 25, 256])  # [batch_size, 5, 5, 256]  -> [batch_size, 25, 256]
-        return x  # [batch_size, 25, 256]. 25=K=Number of regions
+        return x  # [batch_size, 25, 256]. 25=K=Number of regions, 256=d=Dimension of each region
+
+
+class CNNFilters(nn.Module):
+    def __init__(self):
+        super(CNNFilters, self).__init__()
+
+        running_on_linux = 'Linux' in platform.platform()
+        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+
+        self.convolutions = nn.Sequential(
+            nn.Conv2d(3, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
+            nn.Conv2d(16, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+
+            nn.Conv2d(16, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+
+            nn.Conv2d(32, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+
+            nn.Conv2d(64, 128, kernel_size=3), nn.BatchNorm2d(128), nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3), nn.BatchNorm2d(128), nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+
+            nn.Conv2d(128, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
+            nn.Conv2d(256, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+        )
+
+    def forward(self, x):
+        x = self.convolutions(x)
+        x = x.view(x.size(0), x.size(1), -1)
+        return x  # [batch_size, K, d]. 256=K=Number of regions, 25=d=Dimension of feature
 
 
 if __name__ == "__main__":
@@ -402,6 +438,7 @@ if __name__ == "__main__":
     # xception = Xception()
     # mobilenetv2 = MobileNetV2()
     cnn = CNN()
+    cnn_filters = CNNFilters()
 
     # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(xception.parameters())])
     # print(f'============ # Xception parameters: {n_params}============')
@@ -416,6 +453,7 @@ if __name__ == "__main__":
         # single_image_output1 = xception(image[None, ...])
         # single_image_output2 = mobilenetv2(image[None, ...])
         single_image_output3 = cnn(image[None, ...])
+        single_image_output4 = cnn_filters(image[None, ...])
 
         """processing for a batch"""
         # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
@@ -423,7 +461,7 @@ if __name__ == "__main__":
         # batch_image_output1 = xception(images_batch)
         # batch_image_output2 = mobilenetv2(images_batch)
         batch_image_output3 = cnn(images_batch)
-
+        batch_image_output4 = cnn_filters(images_batch)
         # print(i_batch, batch)
         breakpoint()
         break
