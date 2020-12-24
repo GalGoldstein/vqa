@@ -181,9 +181,11 @@ def main():
 
 # TODO:
 #  1. tricks:
-#   - Add weight normalization (bottom_up git)
+#   - Add weight normalization on all nn.Linear() layers (bottom_up git)
 #   - Add dropout (bottom_up git)
 #   - F.normalize(x, p=2, dim=1) image representations ??
+#   - question hidden dim 512 >> 1024 (and all the linear layers in VQA)
+#   - padding CNN to get bigger dim (current is 256)
 #  2. optimizers:
 #    A) torch.optim.Adadelta - no need to adjust lr
 #    B) torch.optim.Adamax
@@ -352,4 +354,4 @@ if __name__ == '__main__':
             print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
             break
 
-        torch.cuda.empty_cache()  # TODO might solve slowness
+        torch.cuda.empty_cache()
