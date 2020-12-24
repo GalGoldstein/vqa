@@ -50,13 +50,11 @@ class VQADataset(Dataset):
     def load_img_from_path(image_path):
         image = Image.open(image_path).convert('RGB')
 
-        # TODO - set parameter for resize in args
-        #  what is the size we want?
         # Resize
         resize = transforms.Resize(size=(299, 299))
         image = resize(image)
 
-        # this also divides by 255 TODO we can normalize too
+        # this also divides by 255
         return TF.to_tensor(image)
 
     def __len__(self):

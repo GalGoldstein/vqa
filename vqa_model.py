@@ -21,11 +21,11 @@ if 'Linux' in platform.platform():
     torch.cuda.empty_cache()
     # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
     rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))  # TODO increase if any problems
+    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
 
 
 # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
-# torch.multiprocessing.set_sharing_strategy('file_system') # TODO maybe delete?
+# torch.multiprocessing.set_sharing_strategy('file_system')
 
 class VQA(nn.Module):
     def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int):
@@ -34,10 +34,8 @@ class VQA(nn.Module):
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        # self.cnn = cnn.CNN().to(self.device)  # TODO
-        self.cnn = cnn.CNNFilters().to(self.device)
+        self.cnn = cnn.CNN().to(self.device)
 
-        #  TODO maybe go back to LSTM?
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
                            gru_params['train_question_path']).to(self.device)
 
@@ -179,10 +177,10 @@ def main():
     pass
 
 
-# TODO:
+# TODO OPTIMIZATIONS:
 #  1. tricks:
 #   - Add weight normalization on all nn.Linear() layers (bottom_up git)
-#   - Add dropout (bottom_up git)
+#   - Add dropout (look at bottom_up git)
 #   - F.normalize(x, p=2, dim=1) image representations ??
 #   - question hidden dim 512 >> 1024 (and all the linear layers in VQA)
 #   - padding CNN to get bigger dim (current is 256)
@@ -193,7 +191,7 @@ def main():
 #   - learning rate
 #   - batch size as big as possible
 #  4. Future:
-#   - Attention the question
+#   - Attention the question (how?)
 #  5. Improve data read process (for speed) -
 #   - Word to index and target - create them in Dataset
 # nohup python -u vqa_model.py > 1.out&
@@ -209,7 +207,7 @@ if __name__ == '__main__':
     # p.sort_stats('tottime').print_stats(250)
     # main()
 
-    # compute_targets()  # TODO uncomment
+    compute_targets()
 
     running_on_linux = 'Linux' in platform.platform()
 
@@ -249,7 +247,7 @@ if __name__ == '__main__':
                                 collate_fn=lambda x: x, drop_last=False)
 
     word_embd_dim = 300
-    img_feature_dim = 25  # TODO 25 for filters 256 for regions
+    img_feature_dim = 256
     question_hidden_dim = 512
     GRU_layers = 1
     gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim, 'n_layers': GRU_layers,
@@ -260,11 +258,10 @@ if __name__ == '__main__':
                 img_feature_dim=img_feature_dim)
     model = model.to(model.device)
 
-    # TODO reduction?
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     # initial_lr = None
     patience = 14  # how many epochs without val loss improvement to stop training
-    optimizer = optim.Adam(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer? LRscheduler?
+    optimizer = optim.Adamax(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer? LRscheduler?
 
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
