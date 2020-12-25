@@ -38,6 +38,9 @@ class VQA(nn.Module):
 
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
                            gru_params['train_question_path']).to(self.device)
+        self.word_embd_dim = gru_params['word_embd_dim']
+        self.question_hidden_dim = gru_params['word_embd_dim']
+        self.n_layers = gru_params['n_layers']
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
@@ -279,11 +282,11 @@ if __name__ == '__main__':
 
     print(f'batch_size = {batch_size}\n'
           f'Device: {model.device}\n'
-          f'word_embd_dim = {word_embd_dim}\n'
-          f'question_hidden_dim = {question_hidden_dim}\n'
-          f'GRU_layers = {GRU_layers}\n'
+          f'word_embd_dim = {more.word_embd_dim}\n'
+          f'question_hidden_dim = {model.question_hidden_dim}\n'
+          f'GRU_layers = {model.n_layers}\n'
           f'patience = {patience}\n'
-          f'target_type = {target_type}\n'
+          f'target_type = {model.target_type}\n'
           f'num_workers = {num_workers}\n'
           f'Image model = {model.cnn._get_name()}\n'
           f'Question model = {model.gru._get_name()}\n'
