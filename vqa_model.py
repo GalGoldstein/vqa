@@ -280,17 +280,17 @@ if __name__ == '__main__':
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
     print(f'============ # Parameters: {n_params}============')
 
-    print(f'batch_size = {batch_size}\n'
-          f'Device: {model.device}\n'
-          f'word_embd_dim = {more.word_embd_dim}\n'
-          f'question_hidden_dim = {model.question_hidden_dim}\n'
-          f'GRU_layers = {model.n_layers}\n'
-          f'patience = {patience}\n'
-          f'target_type = {model.target_type}\n'
-          f'num_workers = {num_workers}\n'
-          f'Image model = {model.cnn._get_name()}\n'
-          f'Question model = {model.gru._get_name()}\n'
-          f'optimizer = {optimizer.__str__()}\n')
+    # print(f'batch_size = {batch_size}\n'
+    #       f'Device: {model.device}\n'
+    #       f'word_embd_dim = {model.word_embd_dim}\n'
+    #       f'question_hidden_dim = {model.question_hidden_dim}\n'
+    #       f'GRU_layers = {model.n_layers}\n'
+    #       f'patience = {patience}\n'
+    #       f'target_type = {model.target_type}\n'
+    #       f'num_workers = {num_workers}\n'
+    #       f'Image model = {model.cnn._get_name()}\n'
+    #       f'Question model = {model.gru._get_name()}\n'
+    #       f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
     epochs = 100
