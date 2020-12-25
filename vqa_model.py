@@ -201,7 +201,8 @@ def main():
 #  {Dropout Yes (0.1?) or No,
 #  Weight normalization Yes or No,
 #  hidden=512 or 1024,
-#  Augmentations Yes or No}
+#  Augmentations Yes or No
+#  Max pooling or Avg pooling}
 # nohup python -u vqa_model.py > 1.out&
 
 if __name__ == '__main__':
@@ -254,7 +255,7 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                 collate_fn=lambda x: x, drop_last=False)
 
-    weights_path = 'vqa_model_epoch_2_val_acc=0.42283.pth'  # TODO change
+    weights_path = ''
     if not weights_path:
         word_embd_dim = 300
         img_feature_dim = 256
@@ -273,29 +274,29 @@ if __name__ == '__main__':
 
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     # initial_lr = None
-    patience = 14  # how many epochs without val loss improvement to stop training
+    patience = 4  # how many epochs without val loss improvement to stop training
     optimizer = optim.Adamax(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer? LRscheduler?
 
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
     print(f'============ # Parameters: {n_params}============')
 
-    # print(f'batch_size = {batch_size}\n'
-    #       f'Device: {model.device}\n'
-    #       f'word_embd_dim = {model.word_embd_dim}\n'
-    #       f'question_hidden_dim = {model.question_hidden_dim}\n'
-    #       f'GRU_layers = {model.n_layers}\n'
-    #       f'patience = {patience}\n'
-    #       f'target_type = {model.target_type}\n'
-    #       f'num_workers = {num_workers}\n'
-    #       f'Image model = {model.cnn._get_name()}\n'
-    #       f'Question model = {model.gru._get_name()}\n'
-    #       f'optimizer = {optimizer.__str__()}\n')
+    print(f'batch_size = {batch_size}\n'
+          f'Device: {model.device}\n'
+          f'word_embd_dim = {model.word_embd_dim}\n'
+          f'question_hidden_dim = {model.question_hidden_dim}\n'
+          f'GRU_layers = {model.n_layers}\n'
+          f'patience = {patience}\n'
+          f'target_type = {model.target_type}\n'
+          f'num_workers = {num_workers}\n'
+          f'Image model = {model.cnn._get_name()}\n'
+          f'Question model = {model.gru._get_name()}\n'
+          f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
     epochs = 100
     count_no_improvement = 0
-    for epoch in range(2, epochs):  # TODO change
+    for epoch in range(epochs):
         train_epoch_losses = list()
         epoch_start_time = time.time()
         timer_questions = time.time()
