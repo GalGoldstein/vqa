@@ -89,7 +89,7 @@ class GRU(nn.Module):
         padded = torch.cat([trimmed, torch.tensor([self.word_idx_mappings['<pad>']] * padding_size).to(self.device)])
         word_embeddings = self.word_embedding(padded.long())
         output, _ = self.encoder(word_embeddings[None, ...])  # currently supporting only a single sentence
-        return output[0][-1]  # return only last hidden state, of the last layer of GRU
+        return output[0][-1].to(self.device)  # return only last hidden state, of the last layer of GRU
 
 
 if __name__ == "__main__":

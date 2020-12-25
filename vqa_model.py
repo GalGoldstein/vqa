@@ -251,17 +251,22 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                 collate_fn=lambda x: x, drop_last=False)
 
-    word_embd_dim = 300
-    img_feature_dim = 256
-    question_hidden_dim = 512
-    GRU_layers = 1
-    gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim, 'n_layers': GRU_layers,
-                   'train_question_path': train_questions_json_path}
+    weights_path = 'vqa_model_epoch_2_val_acc=0.42283.pth'  # TODO change
+    if not weights_path:
+        word_embd_dim = 300
+        img_feature_dim = 256
+        question_hidden_dim = 512
+        GRU_layers = 1
+        gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
+                       'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
 
-    target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
-    model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
-                img_feature_dim=img_feature_dim)
-    model = model.to(model.device)
+        target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
+        model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
+                    img_feature_dim=img_feature_dim)
+        model = model.to(model.device)
+
+    else:
+        model = torch.load(os.path.join('weights', weights_path))
 
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     # initial_lr = None
@@ -287,7 +292,7 @@ if __name__ == '__main__':
     last_epoch_loss = np.inf
     epochs = 100
     count_no_improvement = 0
-    for epoch in range(epochs):
+    for epoch in range(2, epochs):  # TODO change
         train_epoch_losses = list()
         epoch_start_time = time.time()
         timer_questions = time.time()
