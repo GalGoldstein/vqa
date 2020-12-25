@@ -1,13 +1,12 @@
-import math
 import torch
 import sys
 import os
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from dataset import VQADataset
 from compute_softscore import compute_targets
+from torch.nn.utils.weight_norm import weight_norm
 import numpy as np
 import cnn
 import gru
@@ -28,18 +27,22 @@ if 'Linux' in platform.platform():
 # torch.multiprocessing.set_sharing_strategy('file_system')
 
 class VQA(nn.Module):
-    def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int):
+    def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int, padding: int,
+                 dropout: float, pooling: str):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        self.cnn = cnn.CNN().to(self.device)
+        self.cnn = cnn.CNN(padding=padding, pooling=pooling).to(self.device)
+        self.padding = padding
+        self.pooling = pooling
 
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
                            gru_params['train_question_path']).to(self.device)
         self.word_embd_dim = gru_params['word_embd_dim']
-        self.question_hidden_dim = gru_params['word_embd_dim']
+        self.question_hidden_dim = gru_params['question_hidden_dim']
+        self.hidden_dim = gru_params['question_hidden_dim']
         self.n_layers = gru_params['n_layers']
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
@@ -48,23 +51,27 @@ class VQA(nn.Module):
 
         self.softmax = nn.Softmax(dim=1)
         self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+        self.dropout_p = dropout
 
         # relu activation before attention
-        self.linear_inside_relu_attention = nn.Linear(img_feature_dim + gru_params['question_hidden_dim'], 512)
+        self.linear_inside_relu_attention = weight_norm(nn.Linear(img_feature_dim + gru_params['question_hidden_dim'],
+                                                                  self.hidden_dim), dim=None)
         # linear layer after relu activation before attention
-        self.linear_after_relu_attention = nn.Linear(512, 1, bias=False)
+        self.linear_after_relu_attention = weight_norm(nn.Linear(self.hidden_dim, 1, bias=False), dim=None)
 
         # relu activation hidden representation of image
-        self.linear_inside_relu_image = nn.Linear(img_feature_dim, 512)
+        self.linear_inside_relu_image = weight_norm(nn.Linear(img_feature_dim, self.hidden_dim), dim=None)
 
         # relu activation hidden representation of question
-        self.linear_inside_relu_question = nn.Linear(gru_params['question_hidden_dim'], 512)
+        self.linear_inside_relu_question = weight_norm(nn.Linear(gru_params['question_hidden_dim'], self.hidden_dim),
+                                                       dim=None)
 
         # relu activation last
-        self.linear_inside_relu_last = nn.Linear(512, 512)
+        self.linear_inside_relu_last = weight_norm(nn.Linear(self.hidden_dim, self.hidden_dim), dim=None)
 
         # last linear fully connected
-        self.fc = nn.Linear(512, self.num_classes, bias=False)
+        self.fc = weight_norm(nn.Linear(self.hidden_dim, self.num_classes, bias=False), dim=None)
 
     def answers_to_one_hot(self, answers_labels_batch):
         """
@@ -118,9 +125,9 @@ class VQA(nn.Module):
 
         pointwise_mul = torch.mul(relu_imgs, relu_questions)
 
-        relu_mul_product = self.relu(self.linear_inside_relu_last(pointwise_mul))
+        relu_mul_product = self.relu(self.linear_inside_relu_last(self.dropout(pointwise_mul)))
 
-        return self.fc(relu_mul_product)
+        return self.fc(self.dropout(relu_mul_product))
 
 
 def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
@@ -176,10 +183,6 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
         return cur_epoch_loss, loss_not_improved, acc
 
 
-def main():
-    pass
-
-
 # TODO OPTIMIZATIONS:
 #  1. tricks:
 #   - Add weight normalization on all nn.Linear() layers (bottom_up git)
@@ -197,26 +200,23 @@ def main():
 #   - Attention the question (how?)
 #  5. Improve data read process (for speed) -
 #   - Word to index and target - create them in Dataset
-#  Binary decision:
-#  {Dropout Yes (0.1?) or No,
-#  Weight normalization Yes or No,
-#  hidden=512 or 1024,
-#  Augmentations Yes or No
-#  Max pooling or Avg pooling}
+#  Decisions:
+#  dropout: {0.0, 0.1, 0.2)}
+#  pooling: {Max, Avg}
+#  padding: {0, 2}
+#  hidden: {512, 1024}  (this number is both the hidden GRU dim and decides on the # of neurons)
+#  optimizer: {Adamax, Adadelta}
+#  .................................
+#  padding=0 or padding=2 (4 first blocks) (5*5 or 7*7) VVVVVVVVVVVVVVV
+#  hidden=512 or 1024, VVVVVVVVVVVVVVV
+#  Adamax / Adadelta VVVVVVVVVVVVVVV
+#  Augmentations (horizontal flip) **Yes** or No XXXXXXXXXX
+#  Weight normalization **Yes** or No, XXXXXXXXXX
 # nohup python -u vqa_model.py > 1.out&
 
-if __name__ == '__main__':
-    # import cProfile
-    #
-    # PROFFILE = 'prof.profile'
-    # cProfile.run('main()', PROFFILE)
-    # import pstats
-    #
-    # p = pstats.Stats(PROFFILE)
-    # p.sort_stats('tottime').print_stats(250)
-    # main()
 
-    compute_targets()
+def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax'):
+    # compute_targets()
 
     running_on_linux = 'Linux' in platform.platform()
 
@@ -255,27 +255,35 @@ if __name__ == '__main__':
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                 collate_fn=lambda x: x, drop_last=False)
 
-    weights_path = ''
-    if not weights_path:
-        word_embd_dim = 300
-        img_feature_dim = 256
-        question_hidden_dim = 512
-        GRU_layers = 1
-        gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
-                       'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
+    word_embd_dim = 300
+    img_feature_dim = 256
+    GRU_layers = 1
 
-        target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
-        model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
-                    img_feature_dim=img_feature_dim)
-        model = model.to(model.device)
+    # ....................................................................
+    question_hidden_dim = question_hidden_dim  # also control the # of neurons in model
+    padding = padding
+    dropout_p = dropout_p
+    pooling = pooling  # 'max' or 'avg'
+    optimizer_name = optimizer_name  # 'Adamax' or 'Adadelta'
+    #  hidden: {512, 1024}  (this number is both the hidden GRU dim and decides on the # of neurons)
+    #  padding: {0, 2} >> makes 5*5=25 regions with padding=0 or 7*7=49 regions with padding=2
+    #  dropout: {0.0, 0.1, 0.2)}
+    #  pooling: {Max, Avg}
+    #  optimizer: {Adamax, Adadelta}
+    # ....................................................................
 
-    else:
-        model = torch.load(os.path.join('weights', weights_path))
+    gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
+                   'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
+
+    target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
+    model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
+                img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling)
+    model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     # initial_lr = None
     patience = 4  # how many epochs without val loss improvement to stop training
-    optimizer = optim.Adamax(model.parameters())  # , lr=initial_lr)  # TODO weight_decay? optimizer? LRscheduler?
+    optimizer = optim.Adamax(model.parameters()) if optimizer_name == 'Adamax' else optim.Adadelta(model.parameters())
 
     print('============ Starting training ============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
@@ -284,9 +292,12 @@ if __name__ == '__main__':
     print(f'batch_size = {batch_size}\n'
           f'Device: {model.device}\n'
           f'word_embd_dim = {model.word_embd_dim}\n'
-          f'question_hidden_dim = {model.question_hidden_dim}\n'
+          f'question_hidden_dim, linear layers dim = {model.question_hidden_dim}\n'
           f'GRU_layers = {model.n_layers}\n'
           f'patience = {patience}\n'
+          f'pooling = {model.pooling}\n'
+          f'padding = {model.padding}\n'
+          f'dropout probability = {model.dropout_p}\n'
           f'target_type = {model.target_type}\n'
           f'num_workers = {num_workers}\n'
           f'Image model = {model.cnn._get_name()}\n'
@@ -294,7 +305,7 @@ if __name__ == '__main__':
           f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
-    epochs = 100
+    epochs = 5
     count_no_improvement = 0
     for epoch in range(epochs):
         train_epoch_losses = list()
@@ -329,7 +340,6 @@ if __name__ == '__main__':
             loss.backward()
 
             # if exploding gradients:
-            # TODO max_norm? norm_type?
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25, norm_type=2)
 
             # printing gradients norms
@@ -341,15 +351,17 @@ if __name__ == '__main__':
 
             if i_batch and i_batch % int(1000 / batch_size) == 0:
                 print(
-                    f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)} '
+                    f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)}'
                     f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_questions = time.time()
-
+            break  # TODO remove
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
-        cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-            evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+        # cur_epoch_loss, val_loss_didnt_improve, val_acc = \
+        #     evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+        # TODO
+        cur_epoch_loss, val_loss_didnt_improve, val_acc = 1000, False, 0.45
 
         if val_loss_didnt_improve:
             count_no_improvement += 1
@@ -366,3 +378,16 @@ if __name__ == '__main__':
             break
 
         torch.cuda.empty_cache()
+
+
+if __name__ == '__main__':
+    # import cProfile
+    #
+    # PROFFILE = 'prof.profile'
+    # cProfile.run('main()', PROFFILE)
+    # import pstats
+    #
+    # p = pstats.Stats(PROFFILE)
+    # p.sort_stats('tottime').print_stats(250)
+    # main()
+    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax')

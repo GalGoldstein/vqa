@@ -17,10 +17,6 @@ import sys
 
 
 class VQADataset(Dataset):
-    # TODO hyperparameters:
-    #  1. Resize image
-    #  2. Any kind of augmentation? crop? flip?
-
     """Visual Question Answering v2 dataset."""
 
     def __init__(self, target_pickle_path: str, questions_json_path: str, images_path: str, phase: str):
@@ -55,7 +51,10 @@ class VQADataset(Dataset):
         image = resize(image)
 
         # this also divides by 255
-        return TF.to_tensor(image)
+        image = TF.to_tensor(image)
+        if random.random() > 0.5:
+            image = TF.hflip(image)
+        return image
 
     def __len__(self):
         return len(self.target)
@@ -94,44 +93,6 @@ class VQADataset(Dataset):
                 time.sleep(3)
 
         return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
-
-
-# TODO can we make use of any of the following functions? Augmentation and flipping
-# class MyDataset(Dataset):
-#     def __init__(self, image_paths, target_paths, train=True):
-#         self.image_paths = image_paths
-#         self.target_paths = target_paths
-#
-#     def transform(self, image, mask):
-#         # Resize
-#         resize = transforms.Resize(size=(520, 520))
-#         image = resize(image)
-#         mask = resize(mask)
-#
-#         # Random crop
-#         i, j, h, w = transforms.RandomCrop.get_params(
-#             image, output_size=(512, 512))
-#         image = TF.crop(image, i, j, h, w)
-#         mask = TF.crop(mask, i, j, h, w)
-#
-#         # Random horizontal flipping
-#         if random.random() > 0.5:
-#             image = TF.hflip(image)
-#             mask = TF.hflip(mask)
-#
-#         # Transform to tensor
-#         image = TF.to_tensor(image)
-#         mask = TF.to_tensor(mask)
-#         return image, mask
-#
-#     def __getitem__(self, index):
-#         image = Image.open(self.image_paths[index])
-#         mask = Image.open(self.target_paths[index])
-#         x, y = self.transform(image, mask)
-#         return x, y
-#
-#     def __len__(self):
-#         return len(self.image_paths)
 
 
 if __name__ == '__main__':

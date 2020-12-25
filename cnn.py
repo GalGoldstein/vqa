@@ -9,7 +9,7 @@ https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from
 
 
 class CNN(nn.Module):
-    def __init__(self):
+    def __init__(self, padding=0, pooling='max'):
         super(CNN, self).__init__()
 
         running_on_linux = 'Linux' in platform.platform()
@@ -17,25 +17,25 @@ class CNN(nn.Module):
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.convolutions = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
+            nn.Conv2d(3, 16, kernel_size=3, padding=padding), nn.BatchNorm2d(16), nn.ReLU(),
             nn.Conv2d(16, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
-            nn.MaxPool2d(2, 2),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
 
-            nn.Conv2d(16, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3, padding=padding), nn.BatchNorm2d(32), nn.ReLU(),
             nn.Conv2d(32, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU(),
-            nn.MaxPool2d(2, 2),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
 
-            nn.Conv2d(32, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3, padding=padding), nn.BatchNorm2d(64), nn.ReLU(),
             nn.Conv2d(64, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU(),
-            nn.MaxPool2d(2, 2),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
 
-            nn.Conv2d(64, 128, kernel_size=3), nn.BatchNorm2d(128), nn.ReLU(),
+            nn.Conv2d(64, 128, kernel_size=3, padding=padding), nn.BatchNorm2d(128), nn.ReLU(),
             nn.Conv2d(128, 128, kernel_size=3), nn.BatchNorm2d(128), nn.ReLU(),
-            nn.MaxPool2d(2, 2),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
 
             nn.Conv2d(128, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
             nn.Conv2d(256, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
-            nn.MaxPool2d(2, 2),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
         )
 
     def forward(self, x):
@@ -54,7 +54,7 @@ if __name__ == "__main__":
                                    phase='train')
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
 
-    cnn = CNN()
+    cnn = CNN(padding=0)
 
     # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(xception.parameters())])
     # print(f'============ # Xception parameters: {n_params}============')

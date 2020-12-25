@@ -33,13 +33,13 @@ class GRU(nn.Module):
         # Build word dict and init word embeddings #
         self.word_dict = self.get_vocabs_counts()
 
-        # TODO hyper parameters: min_freq, specials? (i set min_freq=2 to train the unk token)
         vocab = Vocab(Counter(self.word_dict), vectors=None, min_freq=2, specials=['<unk>', '<pad>'])
         # set rand vectors and get the weights (the vector embeddings themselves)
         words_embeddings_tensor = nn.Embedding(len(vocab.stoi), word_embd_dim).weight.data
         vocab.set_vectors(stoi=vocab.stoi, vectors=words_embeddings_tensor, dim=word_embd_dim)
         self.word_idx_mappings, self.idx_word_mappings, word_vectors = vocab.stoi, vocab.itos, vocab.vectors
 
+        # T.A. pay attention this is not glove or W2V - we initialize the vectors randomly
         self.word_embedding = nn.Embedding.from_pretrained(word_vectors, freeze=False)
 
         self.encoder = nn.GRU(input_size=word_embd_dim, hidden_size=hidden_dim, num_layers=n_layers,
