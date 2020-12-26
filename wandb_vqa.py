@@ -38,7 +38,7 @@ enter this address+token to local runtime in colab
 
 import os
 
-os.chdir(os.path.join('HW2', 'vqa'))
+# os.chdir(os.path.join('HW2', 'vqa'))
 
 # Ignore excessive warnings
 import logging
