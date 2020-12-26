@@ -42,8 +42,7 @@ class VQADataset(Dataset):
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
 
-    @staticmethod
-    def load_img_from_path(image_path):
+    def load_img_from_path(self, image_path):
         image = Image.open(image_path).convert('RGB')
 
         # Resize
@@ -52,7 +51,7 @@ class VQADataset(Dataset):
 
         # this also divides by 255
         image = TF.to_tensor(image)
-        if random.random() > 0.5:
+        if self.phase == 'train' and random.random() > 0.5:
             image = TF.hflip(image)
         return image
 

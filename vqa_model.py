@@ -271,6 +271,12 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     #  pooling: {Max, Avg}
     #  optimizer: {Adamax, Adadelta}
     # ....................................................................
+    # question_hidden_dim = run.config.hidden  # also control the # of neurons in model
+    # padding = run.config.padding
+    # dropout_p = run.config.dropout
+    # pooling = run.config.pooling  # 'max' or 'avg'
+    # optimizer_name = run.config.optimizer  # 'Adamax' or 'Adadelta'
+    # ....................................................................
 
     gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
                    'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
@@ -349,19 +355,16 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             train_epoch_losses.append(float(loss))
             optimizer.step()
 
-            if i_batch and i_batch % int(1000 / batch_size) == 0:
-                print(
-                    f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)}'
-                    f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
-                timer_questions = time.time()
-            break  # TODO remove
+            # if i_batch and i_batch % int(1000 / batch_size) == 0:
+            #     print(
+            #         f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)}'
+            #         f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
+            #     timer_questions = time.time()
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
-        # cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-        #     evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
-        # TODO
-        cur_epoch_loss, val_loss_didnt_improve, val_acc = 1000, False, 0.45
+        cur_epoch_loss, val_loss_didnt_improve, val_acc = \
+            evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
         if val_loss_didnt_improve:
             count_no_improvement += 1
