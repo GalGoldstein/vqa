@@ -217,22 +217,22 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
          num_workers=4):
-    compute_targets(dir='datashare')
+    compute_targets(dir='content')
 
     running_on_linux = 'Linux' in platform.platform()
 
     if running_on_linux:
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
-                                       questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
-                                       images_path='/datashare',
+                                       questions_json_path='/content/v2_OpenEnded_mscoco_train2014_questions.json',
+                                       images_path='/content',
                                        phase='train')
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
-                                     questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
-                                     images_path='/datashare',
+                                     questions_json_path='/content/v2_OpenEnded_mscoco_val2014_questions.json',
+                                     images_path='/content',
                                      phase='val')
 
-        train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'
-        val_questions_json_path = '/datashare/v2_OpenEnded_mscoco_val2014_questions.json'
+        train_questions_json_path = '/content/v2_OpenEnded_mscoco_train2014_questions.json'
+        val_questions_json_path = '/content/v2_OpenEnded_mscoco_val2014_questions.json'
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     else:

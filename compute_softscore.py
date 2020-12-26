@@ -245,14 +245,14 @@ def get_question(qid, questions):
             return question
 
 
-def load_v2():
+def load_v2(dir):
     running_on_linux = 'Linux' in platform.platform()
 
-    train_answer_file = ('/datashare/' if running_on_linux else 'data/') + 'v2_mscoco_train2014_annotations.json'
+    train_answer_file = (f'/{dir}/' if running_on_linux else 'data/') + 'v2_mscoco_train2014_annotations.json'
     with open(train_answer_file) as f:
         train_answers = json.load(f)['annotations']
 
-    val_answer_file = ('/datashare/' if running_on_linux else 'data/') + 'v2_mscoco_val2014_annotations.json'
+    val_answer_file = (f'/{dir}/' if running_on_linux else 'data/') + 'v2_mscoco_val2014_annotations.json'
     with open(val_answer_file) as f:
         val_answers = json.load(f)['annotations']
 
@@ -262,9 +262,9 @@ def load_v2():
     compute_target(val_answers, ans2label, 'val', "data/cache")
 
 
-def compute_targets():
-    load_v2()
+def compute_targets(dir):
+    load_v2(dir)
 
 
 if __name__ == '__main__':
-    compute_targets()
+    compute_targets(dir='datashare')
