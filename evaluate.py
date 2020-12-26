@@ -1,5 +1,4 @@
 import platform
-from vqa_model import VQA
 from vqa_model import evaluate
 from dataset import VQADataset
 from torch.utils.data import DataLoader

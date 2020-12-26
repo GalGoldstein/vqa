@@ -312,7 +312,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
           f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
-    epochs = 5
+    epochs = 20
     count_no_improvement = 0
     for epoch in range(epochs):
         train_epoch_losses = list()
@@ -356,32 +356,38 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             train_epoch_losses.append(float(loss))
             optimizer.step()
 
-            if i_batch and i_batch % int(1000 * 10 / batch_size) == 0:
-                print(
-                    f'processed {int(1000 * 10 / batch_size) * batch_size} questions in'
-                    f' {int(time.time() - timer_questions)}'
-                    f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
-                timer_questions = time.time()
+            # if i_batch and i_batch % int(1000 * 10 / batch_size) == 0:
+            #     print(
+            #         f'processed {int(1000 * 10 / batch_size) * batch_size} questions in'
+            #         f' {int(time.time() - timer_questions)}'
+            #         f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
+            #     timer_questions = time.time()
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
-        cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-            evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+        if (epoch + 1) % 2 == 0:
+            cur_epoch_loss, val_loss_didnt_improve, val_acc = \
+                evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
-        if val_loss_didnt_improve:
-            count_no_improvement += 1
-            print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
+            print(f"========= Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} =======")
+            path = os.path.join("/content/gdrive/MyDrive",
+                                f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth")
+            torch.save(model, path)
+
+            if val_loss_didnt_improve:
+                count_no_improvement += 1
+                print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
+            else:
+                count_no_improvement = 0
+
+            last_epoch_loss = cur_epoch_loss
+            if count_no_improvement >= patience:
+                print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
+                break
         else:
-            count_no_improvement = 0
-
-        print(f"============ Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ==========")
-        torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
-
-        last_epoch_loss = cur_epoch_loss
-        if count_no_improvement >= patience:
-            print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
-            break
-
+            print(f"========= Saving epoch {epoch + 1} model =======")
+            path = os.path.join("/content/gdrive/MyDrive", f"vqa_model_epoch_{epoch + 1}.pth")
+            torch.save(model, path)
         torch.cuda.empty_cache()
 
 
