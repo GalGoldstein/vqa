@@ -356,9 +356,10 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             train_epoch_losses.append(float(loss))
             optimizer.step()
 
-            if i_batch and i_batch % int(1000 / batch_size) == 0:
+            if i_batch and i_batch % int(1000 * 10 / batch_size) == 0:
                 print(
-                    f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)}'
+                    f'processed {int(1000 * 10 / batch_size) * batch_size} questions in'
+                    f' {int(time.time() - timer_questions)}'
                     f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_questions = time.time()
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
