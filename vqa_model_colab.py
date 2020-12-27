@@ -216,7 +216,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
 
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
-         num_workers=4):
+         num_workers=4, weights='', epochs_done=0):
     compute_targets(dir='content')
 
     running_on_linux = 'Linux' in platform.platform()
@@ -278,14 +278,16 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     # pooling = run.config.pooling  # 'max' or 'avg'
     # optimizer_name = run.config.optimizer  # 'Adamax' or 'Adadelta'
     # ....................................................................
+    if not weights:
+        gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
+                       'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
 
-    gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
-                   'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
-
-    target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
-    model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
-                img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling)
-    model = model.to(model.device)
+        target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
+        model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
+                    img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling)
+        model = model.to(model.device)
+    else:  # continue trining from weights
+        model = torch.load(weights)
 
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
     # initial_lr = None
@@ -314,7 +316,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     last_epoch_loss = np.inf
     epochs = 20
     count_no_improvement = 0
-    for epoch in range(epochs):
+    for epoch in range(epochs_done, epochs):
         train_epoch_losses = list()
         epoch_start_time = time.time()
         timer_questions = time.time()
