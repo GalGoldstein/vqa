@@ -80,7 +80,7 @@ class VQA(nn.Module):
         all_answers = list()
         for labels_count_dict in answers_labels_batch:
             if labels_count_dict:  # not empty dict
-                target_class = max(labels_count_dict, key=labels_count_dict.get)
+                target_class = max(labels_count_dict, key=labels_count_dict.get)  # only the most common answer gets '1'
             else:
                 target_class = self.num_classes  # last class is used for the questions without an answer
             all_answers.append(target_class)
@@ -97,37 +97,37 @@ class VQA(nn.Module):
                 for label, score in soft_score_dict.items():
                     target[label] = score
                 targets.append(target)
-            else:
+            else:  # none of the 10 participants answers to that question were passed the min occurrence
                 idx_questions_without_answers.append(i)
 
         return idx_questions_without_answers, torch.stack(targets, dim=0).to(self.device)
 
     def forward(self, images_batch, questions_batch):
-        # images_representation shape [batch , k , d] where k = number features of image, d = dim of every feature
+        # images_representation shape [batch_size , k , d] where k = number regions of image, d = dim of every feature
         images_representation = self.cnn(images_batch)
         questions_last_hidden = [self.gru(self.gru.words_to_idx(question)) for question in questions_batch]
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
-        expand_dim = [images_representation.shape[1],
-                      questions_representation.shape[0],
-                      questions_representation.shape[1]]
-        concat = torch.cat((images_representation, questions_representation.expand(expand_dim).permute(1, 0, 2)), dim=2)
-        relu_attention = self.relu(self.linear_inside_relu_attention(concat))
+        expand_dim = [images_representation.shape[1],  # k
+                      questions_representation.shape[0],  # batch_size
+                      questions_representation.shape[1]]  # hidden of question = 512
+        concat = torch.cat((images_representation, questions_representation.expand(expand_dim).permute(1, 0, 2)), dim=2) # [batch_size,k,768]
+        relu_attention = self.relu(self.linear_inside_relu_attention(concat))  # [batch_size,k,512]
 
-        img_features_weights = self.softmax(self.linear_after_relu_attention(relu_attention))
+        img_features_weights = self.softmax(self.linear_after_relu_attention(relu_attention))  # [batch_size,k,1]
 
-        attention_img_features = torch.mul(img_features_weights, images_representation)
-        img_sum_weighted_features = torch.sum(attention_img_features, dim=1)
+        attention_img_features = torch.mul(img_features_weights, images_representation)  # [batch_size,k,d]
+        img_sum_weighted_features = torch.sum(attention_img_features, dim=1)  # [batch_size,d]
 
-        relu_imgs = self.relu(self.linear_inside_relu_image(img_sum_weighted_features))
+        relu_imgs = self.relu(self.linear_inside_relu_image(img_sum_weighted_features))  # [batch_size,512]
 
-        relu_questions = self.relu(self.linear_inside_relu_question(questions_representation))
+        relu_questions = self.relu(self.linear_inside_relu_question(questions_representation))  # [batch_size,512]
 
-        pointwise_mul = torch.mul(relu_imgs, relu_questions)
+        pointwise_mul = torch.mul(relu_imgs, relu_questions)  # [batch_size,512]
 
-        relu_mul_product = self.relu(self.linear_inside_relu_last(self.dropout(pointwise_mul)))
+        relu_mul_product = self.relu(self.linear_inside_relu_last(self.dropout(pointwise_mul)))  # [batch_size,512]
 
-        return self.fc(self.dropout(relu_mul_product))
+        return self.fc(self.dropout(relu_mul_product))  # [batch_size,n_classes]
 
 
 def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
