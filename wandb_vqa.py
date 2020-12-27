@@ -269,9 +269,11 @@ sweep_config = {
         'pooling': {
             'values': ['max', 'avg']
         },
-        'optimizer': {
-            'values': ['Adamax', 'Adadelta']
-        }
+        'lr': {
+            'distribution': 'uniform',
+            'min': 0.001,
+            'max': 0.004
+        },
     }
 }
 
@@ -283,7 +285,7 @@ sweep_config = {
 sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")
 
 
-def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax'):
+def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max'):
     try:
         torch.cuda.empty_cache()
         run = wandb.init()
@@ -337,12 +339,11 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         padding = run.config.padding
         dropout_p = run.config.dropout
         pooling = run.config.pooling  # 'max' or 'avg'
-        optimizer_name = run.config.optimizer  # 'Adamax' or 'Adadelta'
+        lr = run.config.lr
         #  hidden: {512, 1024}  (this number is both the hidden GRU dim and decides on the # of neurons)
         #  padding: {0, 2} >> makes 5*5=25 regions with padding=0 or 7*7=49 regions with padding=2
         #  dropout: {0.0, 0.1, 0.2)}
         #  pooling: {Max, Avg}
-        #  optimizer: {Adamax, Adadelta}
         # ....................................................................
 
         gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
@@ -355,8 +356,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
         criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
         patience = 4  # how many epochs without val loss improvement to stop training
-        optimizer = optim.Adamax(model.parameters()) if optimizer_name == 'Adamax' else optim.Adadelta(
-            model.parameters())
+        optimizer = optim.Adamax(model.parameters(), lr=lr)
 
         print('============ Starting training ============')
         n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
@@ -378,7 +378,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
               f'optimizer = {optimizer.__str__()}\n')
 
         last_epoch_loss = np.inf
-        epochs = 5
+        epochs = 4
         count_no_improvement = 0
         for epoch in range(epochs):
             train_epoch_losses = list()
