@@ -36,12 +36,11 @@ class VQADataset(Dataset):
             question['question'] = ' '.join(gru.GRU.preprocess_question_string(question['question']))
         self.img_path = images_path
         self.phase = phase
-        self.imgs_ids = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
+        self.read_pt = read_from_tensor_files
 
         if create_imgs_tensors:  # one time creation of img tensors resized
+            self.imgs_ids = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.save_imgs_tensors()
-
-        self.read_pt = read_from_tensor_files
 
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
