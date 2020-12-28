@@ -43,15 +43,15 @@ class VQADataset(Dataset):
             self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.save_imgs_tensors()
 
-        if force_mem:
-            self.images_tensors = dict()
-            self.read_images()
-
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
             images = [int(s[-15:-3]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
+
+        if force_mem:
+            self.images_tensors = dict()
+            self.read_images()
 
     def read_images(self):
         image_ids = set([q['image_id'] for q in self.questions])
@@ -159,14 +159,15 @@ if __name__ == '__main__':
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
-                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
+                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
+                                   force_mem=True)
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                   collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path=val_questions_json_path,
                                  images_path=images_path,
-                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=True)
+                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=True, force_mem=True)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False,
                                 collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
