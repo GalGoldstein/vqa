@@ -212,6 +212,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
          num_workers=10, activation='relu'):
     # compute_targets(dir='datashare')
+    global vqa_val_dataset
     running_on_linux = 'Linux' in platform.platform()
 
     if running_on_linux:
