@@ -7,7 +7,6 @@ from torch.utils.data import DataLoader
 from dataset import VQADataset
 from compute_softscore import compute_targets
 from torch.nn.utils.weight_norm import weight_norm
-from multiprocessing import set_start_method
 import numpy as np
 import cnn
 import gru
@@ -22,11 +21,6 @@ if 'Linux' in platform.platform():
     # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
     rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
-
-try:
-    set_start_method('spawn')
-except RuntimeError:
-    print('error in spawn')
 
 
 def identity(x):
@@ -421,6 +415,7 @@ if __name__ == '__main__':
         resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
 
     try:
+        from multiprocessing import set_start_method
         set_start_method('spawn')
     except RuntimeError as e:
         print(e)
