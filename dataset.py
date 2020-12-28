@@ -39,12 +39,12 @@ class VQADataset(Dataset):
         self.read_pt = read_from_tensor_files
 
         if create_imgs_tensors:  # one time creation of img tensors resized
-            self.imgs_ids = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
+            self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.save_imgs_tensors()
 
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
-            images = [int(s[15:-3]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
+            images = [int(s[-15:-3]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
 
@@ -67,7 +67,7 @@ class VQADataset(Dataset):
 
     def load_img_from_path(self, image_path):
         if self.read_pt:
-            image = torch.load(image_path).cuda()
+            image = torch.load(image_path)
 
         else:
             image = Image.open(image_path).convert('RGB')

@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from dataset import VQADataset
 from compute_softscore import compute_targets
 from torch.nn.utils.weight_norm import weight_norm
+from multiprocessing import set_start_method
 import numpy as np
 import cnn
 import gru
@@ -22,6 +23,10 @@ if 'Linux' in platform.platform():
     rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
 
+try:
+    set_start_method('spawn')
+except RuntimeError:
+    print('error in spawn')
 
 # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
 # torch.multiprocessing.set_sharing_strategy('file_system')
