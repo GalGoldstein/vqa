@@ -414,7 +414,8 @@ if __name__ == '__main__':
         pass
 
     else:
-        main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max',
+        # 128 * 10 is good for 512 and pad=0
+        main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
              optimizer_name='Adamax', batch_size=128, num_workers=10, activation='relu')
 
     # question_hidden_dim = 512
