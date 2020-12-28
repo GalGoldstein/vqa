@@ -82,7 +82,7 @@ class VQADataset(Dataset):
         # horizontal flip augmentation  TODO - cannot do this to float16
         # if self.phase == 'train' and random.random() > 0.5:
         #     image = TF.hflip(image)
-        return image.cuda()
+        return image
 
     def __len__(self):
         return len(self.target)
