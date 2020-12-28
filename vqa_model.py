@@ -374,6 +374,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
                 timer_questions = time.time()
 
             if i_batch > 200:  # TODO delete
+                print('exiting...')
                 exit(2222)
                 break
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
