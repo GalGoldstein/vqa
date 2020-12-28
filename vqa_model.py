@@ -406,8 +406,8 @@ if __name__ == '__main__':
     # p.sort_stats('tottime').print_stats(250)
     # main()
 
-    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=100,
-         num_workers=12)
+    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
+         num_workers=10)
 
     # question_hidden_dim = 512
     # padding = 0
