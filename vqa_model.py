@@ -14,18 +14,6 @@ import pickle
 import platform
 import time
 
-if 'Linux' in platform.platform():
-    import resource
-
-    torch.cuda.empty_cache()
-    # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
-    rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
-
-torch.multiprocessing.set_sharing_strategy('file_system')
-
-
-# from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
 
 def identity(x):
     return x
@@ -37,7 +25,6 @@ class VQA(nn.Module):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.cnn = cnn.CNN(padding=padding, pooling=pooling).to(self.device)
         self.padding = padding
@@ -222,10 +209,9 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 # nohup python -u vqa_model.py > 1.out&
 
 
-def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
-         num_workers=12, activation='relu'):
+def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
+         num_workers=10, activation='relu'):
     # compute_targets(dir='datashare')
-
     running_on_linux = 'Linux' in platform.platform()
 
     if running_on_linux:
@@ -233,11 +219,6 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/home/student/HW2',
                                        phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
-        vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
-                                     questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
-                                     images_path='/home/student/HW2',
-                                     phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=True)
 
         train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
@@ -260,9 +241,9 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     batch_size = batch_size if running_on_linux else 96
     num_workers = num_workers if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                  collate_fn=identity, drop_last=False, pin_memory=True)
+                                  collate_fn=identity, drop_last=False)  # , pin_memory=True) TODO
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                collate_fn=identity, drop_last=False, pin_memory=True)
+                                collate_fn=identity, drop_last=False)  # , pin_memory=True) TODO
 
     word_embd_dim = 300
     img_feature_dim = 256
@@ -270,22 +251,21 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
     # ....................................................................
     question_hidden_dim = question_hidden_dim  # also control the # of neurons in model
-    padding = padding
+    padding = padding  # makes 5*5=25 regions with padding=0 or 7*7=49 regions with padding=2
     dropout_p = dropout_p
     pooling = pooling  # 'max' or 'avg'
     optimizer_name = optimizer_name  # 'Adamax' or 'Adadelta'
     activation = activation
-    #  hidden: {512, 1024}  (this number is both the hidden GRU dim and decides on the # of neurons)
-    #  padding: {0, 2} >> makes 5*5=25 regions with padding=0 or 7*7=49 regions with padding=2
-    #  dropout: {0.0, 0.1, 0.2)}
-    #  pooling: {Max, Avg}
-    #  optimizer: {Adamax, Adadelta}
     # ....................................................................
-    # question_hidden_dim = run.config.hidden  # also control the # of neurons in model
-    # padding = run.config.padding
-    # dropout_p = run.config.dropout
-    # pooling = run.config.pooling  # 'max' or 'avg'
-    # optimizer_name = run.config.optimizer  # 'Adamax' or 'Adadelta'
+    if use_wandb:
+        run = wandb.init()
+        print("config:", dict(run.config))
+        question_hidden_dim = run.config.hidden  # also control the # of neurons in model
+        padding = run.config.padding
+        dropout_p = run.config.dropout
+        pooling = run.config.pooling  # 'max' or 'avg'
+        optimizer_name = run.config.optimizer  # 'Adamax' or 'Adadelta'
+        activation = run.config.activation  # 'relu' or 'selu'
     # ....................................................................
 
     gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
@@ -323,18 +303,8 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
           f'optimizer = {optimizer.__str__()}\n')
 
     last_epoch_loss = np.inf
-    epochs = 5
+    epochs = 4
     count_no_improvement = 0
-
-    # TODO DELETE
-    print('start time')
-    print(time.time())
-    cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-        evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
-    print('exiting..')
-    print('end time')
-    print(time.time())
-    exit(2222)
 
     for epoch in range(epochs):
         train_epoch_losses = list()
@@ -379,21 +349,23 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             optimizer.step()
 
             if i_batch and i_batch % int(1000 / batch_size) == 0:
-                print(
-                    f'processed {int(1000 / batch_size) * batch_size} questions in'
-                    f' {int(time.time() - timer_questions)} '
-                    f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
+                print(f'processed {int(1000 / batch_size) * batch_size} questions in '
+                      f'{int(time.time() - timer_questions)} '
+                      f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_questions = time.time()
 
-            if i_batch > 200:  # TODO delete
+            if i_batch > 500:  # TODO
                 print('exiting...')
-                exit(2222)
-                break
+                exit(2)
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
+        torch.cuda.empty_cache()
         cur_epoch_loss, val_loss_didnt_improve, val_acc = \
             evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+
+        if use_wandb:
+            wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss})
 
         if val_loss_didnt_improve:
             count_no_improvement += 1
@@ -403,37 +375,83 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
         print(f"========== Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ========")
         torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
+        torch.cuda.empty_cache()
 
         last_epoch_loss = cur_epoch_loss
         if count_no_improvement >= patience:
             print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
             break
 
-        torch.cuda.empty_cache()
-
 
 if __name__ == '__main__':
-    # import cProfile
-    #
-    # PROFFILE = 'prof.profile'
-    # cProfile.run('main()', PROFFILE)
-    # import pstats
-    #
-    # p = pstats.Stats(PROFFILE)
-    # p.sort_stats('tottime').print_stats(250)
-    # main()
-    if len(sys.argv) > 1 and sys.argv[1] == 'wandb':
-        pass
+    if 'Linux' in platform.platform():
+        import resource
 
-    else:
+        torch.cuda.empty_cache()
+        # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
+        rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
+        # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
+        torch.multiprocessing.set_sharing_strategy('file_system')
+
+        # it taked 40 minutes to upload all validation set to RAM
+        vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
+                                     questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
+                                     images_path='/home/student/HW2',
+                                     phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
+                                     force_mem=False)  # TODO DO I WANT force_mem???
+
+    if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
+        use_wandb = True
+        import logging
+        import wandb
+
+        logging.propagate = False
+        logging.getLogger().setLevel(logging.ERROR)
+        torch.manual_seed(42)  # pytorch random seed
+        torch.backends.cudnn.deterministic = True
+
+        sweep_config = {
+            'method': 'random',
+            'metric': {
+                'name': 'Val Accuracy',
+                'goal': 'maximize'
+            },
+            'early_terminate': {
+                'type': 'hyperband',
+                'min_iter': 3
+            },
+            'parameters': {
+                'dropout': {
+                    'distribution': 'uniform',
+                    'min': 0.0,
+                    'max': 0.4
+                },
+                'hidden': {
+                    'values': [512, 1024]
+                },
+                'padding': {
+                    'values': [0, 2]
+                },
+                'pooling': {
+                    'values': ['max', 'avg']
+                },
+                'lr': {
+                    'distribution': 'uniform',
+                    'min': 0.001,
+                    'max': 0.004
+                },
+                'activation': {
+                    'values': ['relu', 'selu']
+                }
+            }
+        }
+
+        sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")
+
+        wandb.agent(sweep_id, function=main)
+
+    else:  # run this code with "python vqa_model.py"
         # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
         main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
              optimizer_name='Adamax', batch_size=128, num_workers=10, activation='relu')
-
-    # question_hidden_dim = 512
-    # padding = 0
-    # dropout_p = 0.0
-    # pooling = 'max'
-    # optimizer_name = 'Adamax'
-    # batch_size = 100
-    # num_workers = 12
