@@ -257,10 +257,10 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         padding = padding  # makes 5*5=25 regions with padding=0 or 7*7=49 regions with padding=2
         dropout_p = dropout_p
         pooling = pooling  # 'max' or 'avg'
-        optimizer_name = optimizer_name  # 'Adamax' or 'Adadelta'
         activation = activation
         # ....................................................................
         run_id = ''
+        lr = 2e-3
         if use_wandb:
             run = wandb.init()
             run_id = '_id=' + str(run.id)
@@ -269,7 +269,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             padding = run.config.padding
             dropout_p = run.config.dropout
             pooling = run.config.pooling  # 'max' or 'avg'
-            optimizer_name = run.config.optimizer  # 'Adamax' or 'Adadelta'
+            lr = run.config.lr
             activation = run.config.activation  # 'relu' or 'selu'
         # ....................................................................
 
@@ -285,7 +285,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
         # initial_lr = None
         patience = 4  # how many epochs without val loss improvement to stop training
-        optimizer = optim.Adamax(model.parameters()) if optimizer_name == 'Adamax' else optim.Adadelta(
+        optimizer = optim.Adamax(model.parameters(), lr=lr) if optimizer_name == 'Adamax' else optim.Adadelta(
             model.parameters())
 
         print('============ Starting training ============')
