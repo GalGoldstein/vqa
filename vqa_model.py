@@ -213,6 +213,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
          num_workers=10, activation='relu'):
     # compute_targets(dir='datashare')
     global vqa_val_dataset
+    global use_wandb
     running_on_linux = 'Linux' in platform.platform()
 
     if running_on_linux:
@@ -453,6 +454,7 @@ if __name__ == '__main__':
         wandb.agent(sweep_id, function=main)
 
     else:  # run this code with "python vqa_model.py"
+        use_wandb = False
         # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
         main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
              optimizer_name='Adamax', batch_size=128, num_workers=10, activation='relu')
