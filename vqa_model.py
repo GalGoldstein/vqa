@@ -458,9 +458,9 @@ if __name__ == '__main__':
     batch_size = batch_size if running_on_linux else 96
     num_workers = num_workers if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                  collate_fn=identity, drop_last=False)
+                                  collate_fn=identity, drop_last=False, pin_memory=True)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                collate_fn=identity, drop_last=False)
+                                collate_fn=identity, drop_last=False, pin_memory=True)
 
     word_embd_dim = 300
     img_feature_dim = 256
