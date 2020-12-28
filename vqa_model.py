@@ -401,7 +401,7 @@ if __name__ == '__main__':
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=True)  # Force reading validation images to RAM
+                                     force_mem=False)  # Force reading validation images to RAM  # TODO True
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
