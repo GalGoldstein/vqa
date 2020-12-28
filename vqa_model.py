@@ -261,6 +261,9 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     # ....................................................................
     if use_wandb:
         run = wandb.init()
+        print(run)
+        print(run.id)
+        exit(777)  # TODO
         print("config:", dict(run.config))
         question_hidden_dim = run.config.hidden  # also control the # of neurons in model
         padding = run.config.padding
@@ -350,15 +353,12 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             train_epoch_losses.append(float(loss))
             optimizer.step()
 
-            if i_batch and i_batch % int(1000 / batch_size) == 0:
+            if not use_wandb and i_batch and i_batch % int(1000 / batch_size) == 0:
                 print(f'processed {int(1000 / batch_size) * batch_size} questions in '
                       f'{int(time.time() - timer_questions)} '
                       f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_questions = time.time()
 
-            if i_batch > 500:  # TODO
-                print('exiting...')
-                exit(2)
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
         print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
@@ -401,7 +401,7 @@ if __name__ == '__main__':
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=True)  # TODO DO I WANT force_mem???
+                                     force_mem=True)  # Force reading validation images to RAM
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
@@ -413,6 +413,7 @@ if __name__ == '__main__':
         torch.manual_seed(42)  # pytorch random seed
         torch.backends.cudnn.deterministic = True
 
+        # define the hyperparameters
         sweep_config = {
             'method': 'random',
             'metric': {
@@ -449,12 +450,14 @@ if __name__ == '__main__':
             }
         }
 
+        # create new sweep
         sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")
 
+        # run the agent to execute the code
         wandb.agent(sweep_id, function=main)
 
     else:  # run this code with "python vqa_model.py"
         use_wandb = False
         # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
-        main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=128, num_workers=10, activation='selu')
+        main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max',
+             optimizer_name='Adamax', batch_size=128, num_workers=10, activation='relu')

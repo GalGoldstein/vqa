@@ -183,38 +183,6 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
         return cur_epoch_loss, loss_not_improved, acc
 
 
-# TODO OPTIMIZATIONS:
-#  1. tricks:
-#   - Add weight normalization on all nn.Linear() layers (bottom_up git)
-#   - Add dropout (look at bottom_up git)
-#   - F.normalize(x, p=2, dim=1) image representations ??
-#   - question hidden dim 512 >> 1024 (and all the linear layers in VQA)
-#   - padding CNN to get bigger dim (current is 256)
-#  2. optimizers:
-#    A) torch.optim.Adadelta - no need to adjust lr
-#    B) torch.optim.Adamax
-#  3. More:
-#   - learning rate
-#   - batch size as big as possible
-#  4. Future:
-#   - Attention the question (how?)
-#  5. Improve data read process (for speed) -
-#   - Word to index and target - create them in Dataset
-#  Decisions:
-#  dropout: {0.0, 0.1, 0.2)}
-#  pooling: {Max, Avg}
-#  padding: {0, 2}
-#  hidden: {512, 1024}  (this number is both the hidden GRU dim and decides on the # of neurons)
-#  optimizer: {Adamax, Adadelta}
-#  .................................
-#  padding=0 or padding=2 (4 first blocks) (5*5 or 7*7) VVVVVVVVVVVVVVV
-#  hidden=512 or 1024, VVVVVVVVVVVVVVV
-#  Adamax / Adadelta VVVVVVVVVVVVVVV
-#  Augmentations (horizontal flip) **Yes** or No XXXXXXXXXX
-#  Weight normalization **Yes** or No, XXXXXXXXXX
-# nohup python -u vqa_model.py > 1.out&
-
-
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
          num_workers=4, weights='', epochs_done=0):
     compute_targets(dir='content')
@@ -403,5 +371,5 @@ if __name__ == '__main__':
     # p = pstats.Stats(PROFFILE)
     # p.sort_stats('tottime').print_stats(250)
     # main()
-    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
-         num_workers=12)
+    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
+         num_workers=4)
