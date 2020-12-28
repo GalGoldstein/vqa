@@ -44,7 +44,7 @@ class VQADataset(Dataset):
 
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
-            images = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
+            images = [int(s[15:-3]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
 
@@ -67,7 +67,7 @@ class VQADataset(Dataset):
 
     def load_img_from_path(self, image_path):
         if self.read_pt:
-            image = torch.load(image_path)
+            image = torch.load(image_path).cuda()
 
         else:
             image = Image.open(image_path).convert('RGB')
@@ -79,10 +79,10 @@ class VQADataset(Dataset):
             # this also divides by 255
             image = TF.to_tensor(image)
 
-        # horizontal flip augmentation
-        if self.phase == 'train' and random.random() > 0.5:
-            image = TF.hflip(image)
-        return image
+        # horizontal flip augmentation  TODO - cannot do this to float16
+        # if self.phase == 'train' and random.random() > 0.5:
+        #     image = TF.hflip(image)
+        return image.cuda()
 
     def __len__(self):
         return len(self.target)
@@ -116,9 +116,10 @@ class VQADataset(Dataset):
                 image_tensor = self.load_img_from_path(image_path)
                 break
 
-            except:
+            except Exception as e:
+                print(f'{e}\n')
                 print(f'Failed in __getitem__ ... trying to load again\n'
-                      f'image path: {image_path}')
+                      f'image path: {image_path}\n')
                 time.sleep(3)
 
         return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
@@ -140,19 +141,20 @@ if __name__ == '__main__':
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
-                                   phase='train', create_imgs_tensors=True, read_from_tensor_files=True)
+                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
-                                  collate_fn=lambda x: x, num_workers=num_workers)
+                                  collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path=val_questions_json_path,
                                  images_path=images_path,
-                                 phase='val', create_imgs_tensors=True, read_from_tensor_files=True)
+                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=True)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False,
-                                collate_fn=lambda x: x, num_workers=num_workers)
+                                collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
     for i_batch, batch in enumerate(train_dataloader):
         print(i_batch, batch)
+        print('\n\n\n\n\n\n\n\n\n')
         break
 
     for i_batch, batch in enumerate(val_dataloader):

@@ -32,7 +32,7 @@ class VQA(nn.Module):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.cnn = cnn.CNN(padding=padding, pooling=pooling).to(self.device)
         self.padding = padding

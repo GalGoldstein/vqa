@@ -26,7 +26,7 @@ class GRU(nn.Module):
 
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.train_question_path = train_question_path
 

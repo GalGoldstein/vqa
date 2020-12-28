@@ -32,7 +32,7 @@ class VQA(nn.Module):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.cnn = cnn.CNN(padding=padding, pooling=pooling).to(self.device)
         self.padding = padding
@@ -315,74 +315,80 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     last_epoch_loss = np.inf
     epochs = 5
     count_no_improvement = 0
-    for epoch in range(epochs):
-        train_epoch_losses = list()
-        epoch_start_time = time.time()
-        timer_questions = time.time()
-        model.train()
-        for i_batch, batch in enumerate(train_dataloader):
-            optimizer.zero_grad()
-            if model.target_type == 'onehot':
-                # answers
-                answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
-                target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
+    with torch.cuda.amp.autocast():
+        for epoch in range(epochs):
+            train_epoch_losses = list()
+            epoch_start_time = time.time()
+            timer_questions = time.time()
+            model.train()
+            for i_batch, batch in enumerate(train_dataloader):
+                optimizer.zero_grad()
+                if model.target_type == 'onehot':
+                    # answers
+                    answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
+                    target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
-                # don't learn from questions without answers
-                idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
-                target = target[target != model.num_classes]
-            else:  # target_type='softscore'
-                answers = [sample['answer'] for sample in batch]
-                idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
+                    # don't learn from questions without answers
+                    idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
+                    target = target[target != model.num_classes]
+                else:  # target_type='softscore'
+                    answers = [sample['answer'] for sample in batch]
+                    idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
 
-            # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
-            images_batch_ = torch.stack([sample['image'] for idx, sample in enumerate(batch)
-                                         if idx not in idx_questions_without_answers], dim=0).to(model.device)
+                # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
+                images_batch_ = torch.stack([sample['image'] for idx, sample in enumerate(batch)
+                                             if idx not in idx_questions_without_answers], dim=0).to(model.device)
 
-            # questions
-            # Natural language e.g. questions_batch_ = ['How many dogs?'...]
-            questions_batch_ = [sample['question'] for idx, sample in enumerate(batch)
-                                if idx not in idx_questions_without_answers]
+                # questions
+                # Natural language e.g. questions_batch_ = ['How many dogs?'...]
+                questions_batch_ = [sample['question'] for idx, sample in enumerate(batch)
+                                    if idx not in idx_questions_without_answers]
 
-            output = model(images_batch_, questions_batch_)
-            loss = criterion(output, target)
-            loss.backward()
+                output = model(images_batch_, questions_batch_)
+                loss = criterion(output, target)
+                loss.backward()
 
-            # if exploding gradients:
-            nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25, norm_type=2)
+                # if exploding gradients:
+                nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25, norm_type=2)
 
-            # printing gradients norms
-            # for name, param in model.named_parameters():
-            #     print(name, param.grad.norm())
+                # printing gradients norms
+                # for name, param in model.named_parameters():
+                #     print(name, param.grad.norm())
 
-            train_epoch_losses.append(float(loss))
-            optimizer.step()
+                train_epoch_losses.append(float(loss))
+                optimizer.step()
 
-            if i_batch and i_batch % int(1000 / batch_size) == 0:
-                print(
-                    f'processed {int(1000 / batch_size) * batch_size} questions in {int(time.time() - timer_questions)}'
-                    f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
-                timer_questions = time.time()
-        print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
-        print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
+                if i_batch and i_batch % int(1000 / batch_size) == 0:
+                    print(
+                        f'processed {int(1000 / batch_size) * batch_size} questions in'
+                        f' {int(time.time() - timer_questions)} '
+                        f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
+                    timer_questions = time.time()
 
-        cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-            evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+                if i_batch > 20:  # TODO delete
+                    exit(2222)
+                    break
+            print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
+            print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
-        if val_loss_didnt_improve:
-            count_no_improvement += 1
-            print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
-        else:
-            count_no_improvement = 0
+            cur_epoch_loss, val_loss_didnt_improve, val_acc = \
+                evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
-        print(f"============ Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ==========")
-        torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
+            if val_loss_didnt_improve:
+                count_no_improvement += 1
+                print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
+            else:
+                count_no_improvement = 0
 
-        last_epoch_loss = cur_epoch_loss
-        if count_no_improvement >= patience:
-            print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
-            break
+            print(f"========== Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ========")
+            torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
 
-        torch.cuda.empty_cache()
+            last_epoch_loss = cur_epoch_loss
+            if count_no_improvement >= patience:
+                print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
+                break
+
+            torch.cuda.empty_cache()
 
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ class CNN(nn.Module):
 
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.convolutions = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3, padding=padding), nn.BatchNorm2d(16), nn.ReLU(),
@@ -54,7 +54,8 @@ if __name__ == "__main__":
                                    phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
 
-    cnn = CNN(padding=0)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    cnn = CNN(padding=0, pooling='max').to(device)
 
     # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(xception.parameters())])
     # print(f'============ # Xception parameters: {n_params}============')
@@ -63,15 +64,16 @@ if __name__ == "__main__":
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(cnn.parameters())])
     print(f'============ # CNN parameters: {n_params}============')
 
-    for i_batch, batch in enumerate(train_dataloader):
-        """processing for a single image"""
-        image = batch[0]['image']
-        single_image_output = cnn(image[None, ...])
+    with torch.cuda.amp.autocast():
+        for i_batch, batch in enumerate(train_dataloader):
+            """processing for a single image"""
+            image = batch[0]['image']
+            single_image_output = cnn(image[None, ...].to(device))
 
-        """processing for a batch"""
-        # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
-        images_batch = torch.stack([sample['image'] for sample in batch], dim=0)
-        batch_image_output = cnn(images_batch)
-        # print(i_batch, batch)
-        breakpoint()
-        break
+            """processing for a batch"""
+            # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
+            images_batch = torch.stack([sample['image'] for sample in batch], dim=0)
+            batch_image_output = cnn(images_batch)
+            # print(i_batch, batch)
+            breakpoint()
+            break
