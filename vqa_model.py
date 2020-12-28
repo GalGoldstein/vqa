@@ -33,7 +33,7 @@ def identity(x):
 
 class VQA(nn.Module):
     def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int, padding: int,
-                 dropout: float, pooling: str):
+                 dropout: float, pooling: str, activation: str):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -55,8 +55,9 @@ class VQA(nn.Module):
         self.target_type = target_type
 
         self.softmax = nn.Softmax(dim=1)
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(dropout)
+        self.activation = activation
+        self.relu = nn.ReLU() if self.activation == 'relu' else nn.SELU()
+        self.dropout = nn.Dropout(dropout) if self.activation == 'relu' else nn.AlphaDropout()
         self.dropout_p = dropout
 
         # relu activation before attention
@@ -222,7 +223,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
 
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
-         num_workers=12):
+         num_workers=12, activation='relu'):
     # compute_targets(dir='datashare')
 
     running_on_linux = 'Linux' in platform.platform()
@@ -231,8 +232,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/home/student/HW2',
-                                       phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                       force_mem=True)
+                                       phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
@@ -246,8 +246,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='data/images',
-                                       phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                       force_mem=True)
+                                       phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
 
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
@@ -274,6 +273,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     dropout_p = dropout_p
     pooling = pooling  # 'max' or 'avg'
     optimizer_name = optimizer_name  # 'Adamax' or 'Adadelta'
+    activation = activation
     #  hidden: {512, 1024}  (this number is both the hidden GRU dim and decides on the # of neurons)
     #  padding: {0, 2} >> makes 5*5=25 regions with padding=0 or 7*7=49 regions with padding=2
     #  dropout: {0.0, 0.1, 0.2)}
@@ -292,7 +292,8 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
     target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
     model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
-                img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling)
+                img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling,
+                activation=activation)
     model = model.to(model.device)
 
     criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
@@ -312,6 +313,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
           f'patience = {patience}\n'
           f'pooling = {model.pooling}\n'
           f'padding = {model.padding}\n'
+          f'activation = {activation}\n'
           f'dropout probability = {model.dropout_p}\n'
           f'target_type = {model.target_type}\n'
           f'num_workers = {num_workers}\n'
@@ -407,9 +409,12 @@ if __name__ == '__main__':
     # p = pstats.Stats(PROFFILE)
     # p.sort_stats('tottime').print_stats(250)
     # main()
+    if len(sys.argv) > 0 and sys.argv[1] == 'wandb':
+        pass
 
-    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
-         num_workers=10)
+    else:
+        main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max',
+             optimizer_name='Adamax', batch_size=256, num_workers=6)
 
     # question_hidden_dim = 512
     # padding = 0
