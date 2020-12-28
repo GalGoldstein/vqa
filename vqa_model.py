@@ -415,7 +415,7 @@ if __name__ == '__main__':
 
     else:
         main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=256, num_workers=5, activation='relu')
+             optimizer_name='Adamax', batch_size=128, num_workers=10, activation='relu')
 
     # question_hidden_dim = 512
     # padding = 0
