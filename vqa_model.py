@@ -14,21 +14,12 @@ import pickle
 import platform
 import time
 
-if 'Linux' in platform.platform():
-    import resource
-
-    torch.cuda.empty_cache()
-    # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
-    rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
-
 
 def identity(x):
     return x
 
 
 # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
-# torch.multiprocessing.set_sharing_strategy('file_system')
 
 class VQA(nn.Module):
     def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int, padding: int,
@@ -405,13 +396,23 @@ if __name__ == '__main__':
     # p.sort_stats('tottime').print_stats(250)
     # main()
 
-    try:
-        from multiprocessing import set_start_method
+    # try:
+    #     from multiprocessing import set_start_method
+    #
+    #     set_start_method('spawn', force=True)
+    # except RuntimeError as e:
+    #     print(e)
+    #     print('error in spawn')
 
-        set_start_method('spawn', force=True)
-    except RuntimeError as e:
-        print(e)
-        print('error in spawn')
+    if 'Linux' in platform.platform():
+        import resource
+
+        torch.cuda.empty_cache()
+        # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
+        rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
+
+    torch.multiprocessing.set_sharing_strategy('file_system')
 
     # question_hidden_dim = 512
     # padding = 0
@@ -421,5 +422,5 @@ if __name__ == '__main__':
     # batch_size = 128
     # num_workers = 2
 
-    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
-         num_workers=2)
+    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=100,
+         num_workers=12)
