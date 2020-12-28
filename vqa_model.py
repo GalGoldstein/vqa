@@ -427,4 +427,4 @@ if __name__ == '__main__':
         print('error in spawn')
 
     main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
-         num_workers=4)
+         num_workers=0)
