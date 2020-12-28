@@ -416,7 +416,8 @@ if __name__ == '__main__':
 
     try:
         from multiprocessing import set_start_method
-        set_start_method('spawn')
+        # set_start_method('spawn')
+        set_start_method('forkserver', force=True)
     except RuntimeError as e:
         print(e)
         print('error in spawn')
