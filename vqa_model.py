@@ -419,7 +419,7 @@ if __name__ == '__main__':
     pooling = 'max'
     optimizer_name = 'Adamax'
     batch_size = 64
-    num_workers = 4
+    num_workers = 12
 
     running_on_linux = 'Linux' in platform.platform()
 
