@@ -77,7 +77,7 @@ class VQADataset(Dataset):
             image = TF.to_tensor(image)
             save_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.pt')
             torch.save(image.to(dtype=torch.float16), save_path)
-            os.remove(image_path)  # delete .jpg file # TODO
+            os.remove(image_path)  # delete .jpg file
 
     def load_img_from_path(self, image_path):
         if self.read_pt:

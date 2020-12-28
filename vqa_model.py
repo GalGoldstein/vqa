@@ -259,11 +259,10 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     optimizer_name = optimizer_name  # 'Adamax' or 'Adadelta'
     activation = activation
     # ....................................................................
+    run_id = ''
     if use_wandb:
         run = wandb.init()
-        print(run)
-        print(run.id)
-        exit(777)  # TODO
+        run_id = '_id=' + str(run.id)
         print("config:", dict(run.config))
         question_hidden_dim = run.config.hidden  # also control the # of neurons in model
         padding = run.config.padding
@@ -376,7 +375,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             count_no_improvement = 0
 
         print(f"========== Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ========")
-        torch.save(model, os.path.join("weights", f"vqa_model_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
+        torch.save(model, os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
         torch.cuda.empty_cache()
 
         last_epoch_loss = cur_epoch_loss
@@ -401,7 +400,7 @@ if __name__ == '__main__':
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=False)  # Force reading validation images to RAM  # TODO True
+                                     force_mem=True)  # Force reading validation images to RAM
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
