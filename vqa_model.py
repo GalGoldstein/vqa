@@ -410,12 +410,12 @@ if __name__ == '__main__':
     # p = pstats.Stats(PROFFILE)
     # p.sort_stats('tottime').print_stats(250)
     # main()
-    if len(sys.argv) > 0 and sys.argv[1] == 'wandb':
+    if len(sys.argv) > 1 and sys.argv[1] == 'wandb':
         pass
 
     else:
         main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=256, num_workers=6)
+             optimizer_name='Adamax', batch_size=256, num_workers=6, activation='relu')
 
     # question_hidden_dim = 512
     # padding = 0
