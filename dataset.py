@@ -19,7 +19,8 @@ import sys
 class VQADataset(Dataset):
     """Visual Question Answering v2 dataset."""
 
-    def __init__(self, target_pickle_path: str, questions_json_path: str, images_path: str, phase: str):
+    def __init__(self, target_pickle_path: str, questions_json_path: str, images_path: str, phase: str,
+                 create_imgs_tensors: bool = False, read_from_tensor_files: bool = True):
         """
         parameters:
             target_pickle_path: (str) path to pickle file produced with compute_softscore.py
@@ -35,6 +36,12 @@ class VQADataset(Dataset):
             question['question'] = ' '.join(gru.GRU.preprocess_question_string(question['question']))
         self.img_path = images_path
         self.phase = phase
+        self.imgs_ids = [int(s[15:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
+
+        if create_imgs_tensors:  # one time creation of img tensors resized
+            self.save_imgs_tensors()
+
+        self.read_pt = read_from_tensor_files
 
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
@@ -42,15 +49,38 @@ class VQADataset(Dataset):
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
 
+    def save_imgs_tensors(self):
+        for img_id in self.imgs_ids:
+            # the image .jpg path contains 12 chars for image id
+            image_id = str(img_id).zfill(12)
+            image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.jpg')
+            image = Image.open(image_path).convert('RGB')
+
+            # Resize
+            resize = transforms.Resize(size=(299, 299))
+            image = resize(image)
+
+            # this also divides by 255
+            image = TF.to_tensor(image)
+            save_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.pt')
+            torch.save(image.to(dtype=torch.float16), save_path)
+            os.remove(image_path)  # delete .jpg file # TODO
+
     def load_img_from_path(self, image_path):
-        image = Image.open(image_path).convert('RGB')
+        if self.read_pt:
+            image = torch.load(image_path)
 
-        # Resize
-        resize = transforms.Resize(size=(299, 299))
-        image = resize(image)
+        else:
+            image = Image.open(image_path).convert('RGB')
 
-        # this also divides by 255
-        image = TF.to_tensor(image)
+            # Resize
+            resize = transforms.Resize(size=(299, 299))
+            image = resize(image)
+
+            # this also divides by 255
+            image = TF.to_tensor(image)
+
+        # horizontal flip augmentation
         if self.phase == 'train' and random.random() > 0.5:
             image = TF.hflip(image)
         return image
@@ -79,7 +109,8 @@ class VQADataset(Dataset):
 
         # the image .jpg path contains 12 chars for image id
         image_id = str(question_dict['image_id']).zfill(12)
-        image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.jpg')
+        extension = 'pt' if self.read_pt else 'jpg'
+        image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.{extension}')
 
         for i in range(10):
             try:  # full path to image
@@ -95,33 +126,36 @@ class VQADataset(Dataset):
 
 
 if __name__ == '__main__':
-
     running_on_linux = 'Linux' in platform.platform()
     if running_on_linux:
-        train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'
-        val_questions_json_path = '/datashare/v2_OpenEnded_mscoco_val2014_questions.json'
-        images_path = '/datashare'
+        train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
+        val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
+        images_path = '/home/student/HW2'
     else:
         train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         images_path = 'data/images'
 
+    num_workers = 12 if running_on_linux else 0
+
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
-                                   phase='train')
+                                   phase='train', create_imgs_tensors=True, read_from_tensor_files=True)
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
-                                  collate_fn=lambda x: x)
+                                  collate_fn=lambda x: x, num_workers=num_workers)
+
+    vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
+                                 questions_json_path=val_questions_json_path,
+                                 images_path=images_path,
+                                 phase='val', create_imgs_tensors=True, read_from_tensor_files=True)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False,
+                                collate_fn=lambda x: x, num_workers=num_workers)
 
     for i_batch, batch in enumerate(train_dataloader):
         print(i_batch, batch)
         break
 
-    vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
-                                 questions_json_path=val_questions_json_path,
-                                 images_path=images_path,
-                                 phase='val')
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, collate_fn=lambda x: x)
     for i_batch, batch in enumerate(val_dataloader):
         print(i_batch, batch)
         break

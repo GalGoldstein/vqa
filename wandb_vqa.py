@@ -297,28 +297,28 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max'):
 
         if running_on_linux:
             vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
-                                           questions_json_path='/datashare/v2_OpenEnded_mscoco_train2014_questions.json',
-                                           images_path='/datashare',
-                                           phase='train')
+                                           questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
+                                           images_path='/home/student/HW2',
+                                           phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
             vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
-                                         questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
-                                         images_path='/datashare',
-                                         phase='val')
+                                         questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
+                                         images_path='/home/student/HW2',
+                                         phase='val', create_imgs_tensors=False, read_from_tensor_files=True)
 
-            train_questions_json_path = '/datashare/v2_OpenEnded_mscoco_train2014_questions.json'
-            val_questions_json_path = '/datashare/v2_OpenEnded_mscoco_val2014_questions.json'
+            train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
+            val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
             label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
         else:
             vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                            questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                            images_path='data/images',
-                                           phase='train')
+                                           phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
 
             vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                          questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',
                                          images_path='data/images',
-                                         phase='val')
+                                         phase='val', create_imgs_tensors=False, read_from_tensor_files=True)
             train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
             val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
             label2ans_path_ = 'data/cache/train_label2ans.pkl'
