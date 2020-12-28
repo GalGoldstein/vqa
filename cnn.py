@@ -39,10 +39,11 @@ class CNN(nn.Module):
         )
 
     def forward(self, x):
-        x = self.convolutions(x)  # x.shape =  [batch_size, 3, 299, 299]
-        x = x.permute(0, 2, 3, 1)  # [batch_size, 256, 5, 5] -> [batch_size, 5, 5, 256]
-        x = x.reshape([x.size(0), x.size(1) * x.size(2), -1])  # [batch_size, 5, 5, 256]  -> [batch_size, 25, 256]
-        return x  # [batch_size, 25, 256]. 25=K=Number of regions, 256=d=Dimension of each region
+        with torch.cuda.amp.autocast():
+            x = self.convolutions(x)  # x.shape =  [batch_size, 3, 299, 299]
+            x = x.permute(0, 2, 3, 1)  # [batch_size, 256, 5, 5] -> [batch_size, 5, 5, 256]
+            x = x.reshape([x.size(0), x.size(1) * x.size(2), -1])  # [batch_size, 5, 5, 256]  -> [batch_size, 25, 256]
+            return x  # [batch_size, 25, 256]. 25=K=Number of regions, 256=d=Dimension of each region
 
 
 if __name__ == "__main__":
