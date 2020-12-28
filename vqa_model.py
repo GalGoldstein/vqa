@@ -421,5 +421,5 @@ if __name__ == '__main__':
     # batch_size = 128
     # num_workers = 2
 
-    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
-         num_workers=4)
+    main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
+         num_workers=2)
