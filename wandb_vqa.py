@@ -82,9 +82,9 @@ if 'Linux' in platform.platform():
     rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
     resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
 
-
 # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
 torch.multiprocessing.set_sharing_strategy('file_system')
+
 
 class VQA(nn.Module):
     def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int, padding: int,
@@ -300,7 +300,8 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max'):
                 vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                                questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                                images_path='/home/student/HW2',
-                                               phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
+                                               phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
+                                               force_mem=True)
                 vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                              questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                              images_path='/home/student/HW2',
@@ -314,7 +315,8 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max'):
                 vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                                questions_json_path='data/v2_OpenEnded_mscoco_train2014_questions.json',
                                                images_path='data/images',
-                                               phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
+                                               phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
+                                               force_mem=True)
 
                 vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                              questions_json_path='data/v2_OpenEnded_mscoco_val2014_questions.json',

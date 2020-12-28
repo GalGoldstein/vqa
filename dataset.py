@@ -20,7 +20,7 @@ class VQADataset(Dataset):
     """Visual Question Answering v2 dataset."""
 
     def __init__(self, target_pickle_path: str, questions_json_path: str, images_path: str, phase: str,
-                 create_imgs_tensors: bool = False, read_from_tensor_files: bool = True):
+                 create_imgs_tensors: bool = False, read_from_tensor_files: bool = True, force_mem: bool = False):
         """
         parameters:
             target_pickle_path: (str) path to pickle file produced with compute_softscore.py
@@ -37,16 +37,30 @@ class VQADataset(Dataset):
         self.img_path = images_path
         self.phase = phase
         self.read_pt = read_from_tensor_files
+        self.load_imgs_to_mem = force_mem
 
         if create_imgs_tensors:  # one time creation of img tensors resized
             self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.save_imgs_tensors()
+
+        if force_mem:
+            self.images_tensors = dict()
+            self.read_images()
 
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
             images = [int(s[-15:-3]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
+
+    def read_images(self):
+        image_ids = set([q['image_id'] for q in self.questions])
+        for image_id in image_ids:
+            # full path to image
+            # the image .jpg path contains 12 chars for image id
+            image_id = str(image_id).zfill(12)
+            image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.pt')
+            self.images_tensors[int(image_id)] = torch.load(image_path)
 
     def save_imgs_tensors(self):
         for img_id in self.imgs_ids:
@@ -111,16 +125,20 @@ class VQADataset(Dataset):
         extension = 'pt' if self.read_pt else 'jpg'
         image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.{extension}')
 
-        for i in range(10):
-            try:  # full path to image
-                image_tensor = self.load_img_from_path(image_path)
-                break
+        if self.load_imgs_to_mem:  # load the image from RAM
+            image_tensor = self.images_tensors[int(image_id)]
 
-            except Exception as e:
-                print(f'{e}\n')
-                print(f'Failed in __getitem__ ... trying to load again\n'
-                      f'image path: {image_path}\n')
-                time.sleep(3)
+        else:
+            for i in range(10):
+                try:  # full path to image
+                    image_tensor = self.load_img_from_path(image_path)
+                    break
+
+                except Exception as e:
+                    print(f'{e}\n')
+                    print(f'Failed in __getitem__ ... trying to load again\n'
+                          f'image path: {image_path}\n')
+                    time.sleep(3)
 
         return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
 
@@ -141,7 +159,8 @@ if __name__ == '__main__':
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
-                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
+                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
+                                   force_mem=True)
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                   collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
