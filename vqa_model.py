@@ -368,7 +368,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
                     f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_questions = time.time()
 
-            if i_batch > 20:  # TODO delete
+            if i_batch > 20000:  # TODO delete
                 exit(2222)
                 break
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
@@ -405,13 +405,13 @@ if __name__ == '__main__':
     # p.sort_stats('tottime').print_stats(250)
     # main()
 
-    # try:
-    #     from multiprocessing import set_start_method
-    #
-    #     set_start_method('spawn', force=True)
-    # except RuntimeError as e:
-    #     print(e)
-    #     print('error in spawn')
+    try:
+        from multiprocessing import set_start_method
+
+        set_start_method('spawn', force=True)
+    except RuntimeError as e:
+        print(e)
+        print('error in spawn')
 
     question_hidden_dim = 512
     padding = 0
@@ -419,7 +419,7 @@ if __name__ == '__main__':
     pooling = 'max'
     optimizer_name = 'Adamax'
     batch_size = 64
-    num_workers = 0
+    num_workers = 4
 
     running_on_linux = 'Linux' in platform.platform()
 
@@ -565,7 +565,7 @@ if __name__ == '__main__':
                     f'secs.  {i_batch * batch_size} / {len(vqa_train_dataset)} total')
                 timer_questions = time.time()
 
-            if i_batch > 20:  # TODO delete
+            if i_batch > 20000:  # TODO delete
                 exit(2222)
                 break
         print(f"epoch {epoch + 1}/{epochs} mean train loss: {round(float(np.mean(train_epoch_losses)), 4)}")
