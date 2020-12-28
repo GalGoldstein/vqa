@@ -243,9 +243,9 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     batch_size = batch_size if running_on_linux else 96
     num_workers = num_workers if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                  collate_fn=identity, drop_last=False)  # , pin_memory=True) TODO
+                                  collate_fn=identity, drop_last=False)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                collate_fn=identity, drop_last=False)  # , pin_memory=True) TODO
+                                collate_fn=identity, drop_last=False)
 
     word_embd_dim = 300
     img_feature_dim = 256
@@ -401,7 +401,7 @@ if __name__ == '__main__':
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=False)  # TODO DO I WANT force_mem???
+                                     force_mem=True)  # TODO DO I WANT force_mem???
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
@@ -457,4 +457,4 @@ if __name__ == '__main__':
         use_wandb = False
         # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
         main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=128, num_workers=10, activation='relu')
+             optimizer_name='Adamax', batch_size=128, num_workers=10, activation='selu')
