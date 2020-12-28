@@ -405,21 +405,13 @@ if __name__ == '__main__':
     # p.sort_stats('tottime').print_stats(250)
     # main()
 
-    if 'Linux' in platform.platform():
-        import resource
-
-        torch.cuda.empty_cache()
-        # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
-        rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-        resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
-
-    try:
-        from multiprocessing import set_start_method
-
-        set_start_method('spawn', force=True)
-    except RuntimeError as e:
-        print(e)
-        print('error in spawn')
+    # try:
+    #     from multiprocessing import set_start_method
+    #
+    #     set_start_method('spawn', force=True)
+    # except RuntimeError as e:
+    #     print(e)
+    #     print('error in spawn')
 
     question_hidden_dim = 512
     padding = 0
