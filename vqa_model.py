@@ -236,7 +236,8 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
-                                     phase='val', create_imgs_tensors=False, read_from_tensor_files=True)
+                                     phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
+                                     force_mem=True)
 
         train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
@@ -324,6 +325,17 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     last_epoch_loss = np.inf
     epochs = 5
     count_no_improvement = 0
+
+    # TODO DELETE
+    print('start time')
+    print(time.time())
+    cur_epoch_loss, val_loss_didnt_improve, val_acc = \
+        evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+    print('exiting..')
+    print('end time')
+    print(time.time())
+    exit(2222)
+
     for epoch in range(epochs):
         train_epoch_losses = list()
         epoch_start_time = time.time()
@@ -414,7 +426,7 @@ if __name__ == '__main__':
         pass
 
     else:
-        # 128 * 10 is good for 512 and pad=0
+        # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
         main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
              optimizer_name='Adamax', batch_size=128, num_workers=10, activation='relu')
 
