@@ -28,6 +28,11 @@ try:
 except RuntimeError:
     print('error in spawn')
 
+
+def identity(x):
+    return x
+
+
 # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
 # torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -223,7 +228,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
          num_workers=12):
-    compute_targets(dir='datashare')
+    # compute_targets(dir='datashare')
 
     running_on_linux = 'Linux' in platform.platform()
 
@@ -258,9 +263,9 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
     batch_size = batch_size if running_on_linux else 96
     num_workers = num_workers if running_on_linux else 0
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                  collate_fn=lambda x: x, drop_last=False)
+                                  collate_fn=identity, drop_last=False)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                collate_fn=lambda x: x, drop_last=False)
+                                collate_fn=identity, drop_last=False)
 
     word_embd_dim = 300
     img_feature_dim = 256
