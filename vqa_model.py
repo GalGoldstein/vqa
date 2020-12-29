@@ -206,20 +206,15 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
 
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
-         num_workers=10, activation='relu'):
+         num_workers=0, activation='relu'):
     # compute_targets(dir='datashare')
+    global vqa_train_dataset
     global vqa_val_dataset
     global use_wandb
     try:
         running_on_linux = 'Linux' in platform.platform()
 
         if running_on_linux:
-            vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
-                                           questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
-                                           images_path='/home/student/HW2',
-                                           phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                           force_mem=True)  # TODO
-
             train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
             val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
             label2ans_path_ = 'data/cache/train_label2ans.pkl'
@@ -395,14 +390,18 @@ if __name__ == '__main__':
         rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
         resource.setrlimit(resource.RLIMIT_NOFILE, (8192, rlimit[1]))
         # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
-        # torch.multiprocessing.set_sharing_strategy('file_system')
+        # torch.multiprocessing.set_sharing_strategy('file_system')  # TODO
 
-        # it taked 40 minutes to upload all validation set to RAM
+        vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
+                                       questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
+                                       images_path='/home/student/HW2',
+                                       phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
+                                       force_mem=True)
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=False)  # Force reading validation images to RAM
+                                     force_mem=False)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
