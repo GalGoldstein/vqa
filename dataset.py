@@ -1,7 +1,6 @@
 import torch
 import os
-import io
-import numpy as np
+import psutil
 import json
 import pickle
 import platform
@@ -9,12 +8,9 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from PIL import Image
 from torchvision import transforms
-import torch.nn.functional as F
-import random
 import time
 import torchvision.transforms.functional as TF
 import gru
-import sys
 
 
 class VQADataset(Dataset):
@@ -54,15 +50,6 @@ class VQADataset(Dataset):
             self.images_tensors = dict()
             self.read_images()
 
-    # def resize_to_224(self):
-    #     resize = transforms.Resize(size=(224, 224))
-    #     for image_id in set([q['image_id'] for q in self.questions]):
-    #         path = os.path.join(self.img_path, f'{self.phase}2014',
-    #                             f'COCO_{self.phase}2014_{str(image_id).zfill(12)}.pt')
-    #         img = torch.load(path)
-    #         os.remove(path)
-    #         torch.save(TF.to_tensor(resize(TF.to_pil_image(img.to(dtype=torch.float32)))).to(dtype=torch.float16),path)
-
     def read_images(self):
         print(f'reading {self.phase} images to RAM')
         for image_id in set([q['image_id'] for q in self.questions]):
@@ -73,6 +60,7 @@ class VQADataset(Dataset):
             self.images_tensors[int(image_id)] = torch.load(path)
             if len(self.images_tensors) % 5000 == 0:
                 print(f'{self.phase}, len(self.images_tensors) = {len(self.images_tensors)}')
+                psutil.virtual_memory()
 
     def save_imgs_tensors(self):
         resize = transforms.Resize(size=(224, 224))
@@ -171,7 +159,7 @@ if __name__ == '__main__':
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
-                                   phase='train', create_imgs_tensors=True, read_from_tensor_files=True,
+                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
                                    force_mem=False)
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                   collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
@@ -179,7 +167,7 @@ if __name__ == '__main__':
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path=val_questions_json_path,
                                  images_path=images_path,
-                                 phase='val', create_imgs_tensors=True, read_from_tensor_files=True, force_mem=False)
+                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=True, force_mem=False)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False,
                                 collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
