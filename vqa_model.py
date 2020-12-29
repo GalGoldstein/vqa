@@ -304,15 +304,6 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         epochs = 4
         count_no_improvement = 0
 
-        # TODO
-        print(time.time())
-        print('start val')
-        cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-                evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
-        print('end val')
-        print(time.time())
-        exit(777)
-
         for epoch in range(epochs):
             train_epoch_losses = list()
             epoch_start_time = time.time()
