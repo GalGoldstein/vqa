@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from PIL import Image
 from torchvision import transforms
+import torch.nn.functional as F
 import random
 import time
 import torchvision.transforms.functional as TF
@@ -55,12 +56,15 @@ class VQADataset(Dataset):
 
     def read_images(self):
         image_ids = set([q['image_id'] for q in self.questions])
+        resize = transforms.Resize(size=(224, 224))
         for image_id in image_ids:
             # full path to image
             # the image .jpg path contains 12 chars for image id
             image_id = str(image_id).zfill(12)
             image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.pt')
-            self.images_tensors[int(image_id)] = torch.load(image_path)
+            img = TF.to_pil_image(torch.load(image_path).to(dtype=torch.float32))
+            self.images_tensors[int(image_id)] = TF.to_tensor(resize(img)).to(dtype=torch.float16)
+            del img
 
     def save_imgs_tensors(self):
         for img_id in self.imgs_ids:

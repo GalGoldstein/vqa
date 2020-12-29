@@ -56,7 +56,7 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, collate_fn=lambda x: x)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    cnn = CNN(padding=0, pooling='max').to(device)
+    cnn = CNN(padding=2, pooling='max').to(device)
 
     # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(xception.parameters())])
     # print(f'============ # Xception parameters: {n_params}============')
