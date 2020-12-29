@@ -55,9 +55,11 @@ class VQADataset(Dataset):
             self.read_images()
 
     def read_images(self):
-        image_ids = set([q['image_id'] for q in self.questions])
+        print(f'reading {self.phase} images to RAM')
+        time.sleep(30)
+        print('finished sleeping')
         resize = transforms.Resize(size=(224, 224))
-        for image_id in image_ids:
+        for image_id in set([q['image_id'] for q in self.questions]):
             # full path to image
             # the image .jpg path contains 12 chars for image id
             path = os.path.join(self.img_path, f'{self.phase}2014',
@@ -66,7 +68,7 @@ class VQADataset(Dataset):
                 resize(TF.to_pil_image(torch.load(path).to(dtype=torch.float32)))).to(dtype=torch.float16)
             if len(self.images_tensors) % 5000 == 0:
                 print(f'{self.phase}, len(self.images_tensors) = {len(self.images_tensors)}')
-        del image_ids
+                time.sleep(10)
 
     def save_imgs_tensors(self):
         for img_id in self.imgs_ids:
