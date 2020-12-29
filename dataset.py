@@ -40,6 +40,10 @@ class VQADataset(Dataset):
         self.read_pt = read_from_tensor_files
         self.load_imgs_to_mem = force_mem
 
+        self.resize_to_224()  # TODO
+        print(f'exiting {self.phase}')
+        exit()
+
         if create_imgs_tensors:  # one time creation of img tensors resized
             self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.save_imgs_tensors()
@@ -54,21 +58,25 @@ class VQADataset(Dataset):
             self.images_tensors = dict()
             self.read_images()
 
+    def resize_to_224(self):
+        resize = transforms.Resize(size=(224, 224))
+        for image_id in set([q['image_id'] for q in self.questions]):
+            path = os.path.join(self.img_path, f'{self.phase}2014',
+                                f'COCO_{self.phase}2014_{str(image_id).zfill(12)}.pt')
+            img = torch.load(path)
+            os.remove(path)
+            torch.save(TF.to_tensor(resize(TF.to_pil_image(img.to(dtype=torch.float32)))).to(dtype=torch.float16), path)
+
     def read_images(self):
         print(f'reading {self.phase} images to RAM')
-        time.sleep(30)
-        print('finished sleeping')
-        resize = transforms.Resize(size=(224, 224))
         for image_id in set([q['image_id'] for q in self.questions]):
             # full path to image
             # the image .jpg path contains 12 chars for image id
             path = os.path.join(self.img_path, f'{self.phase}2014',
                                 f'COCO_{self.phase}2014_{str(image_id).zfill(12)}.pt')
-            self.images_tensors[int(image_id)] = TF.to_tensor(
-                resize(TF.to_pil_image(torch.load(path).to(dtype=torch.float32)))).to(dtype=torch.float16)
+            self.images_tensors[int(image_id)] = torch.load(path)
             if len(self.images_tensors) % 5000 == 0:
                 print(f'{self.phase}, len(self.images_tensors) = {len(self.images_tensors)}')
-                time.sleep(10)
 
     def save_imgs_tensors(self):
         for img_id in self.imgs_ids:
