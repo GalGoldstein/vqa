@@ -460,4 +460,4 @@ if __name__ == '__main__':
         use_wandb = False
         # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
         main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=256, num_workers=5, activation='relu')
+             optimizer_name='Adamax', batch_size=128, num_workers=6, activation='relu')
