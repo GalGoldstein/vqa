@@ -217,7 +217,8 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                            questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                            images_path='/home/student/HW2',
-                                           phase='train', create_imgs_tensors=False, read_from_tensor_files=True)
+                                           phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
+                                           force_mem=True)  # TODO
 
             train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
             val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
@@ -459,5 +460,5 @@ if __name__ == '__main__':
     else:  # run this code with "python vqa_model.py"
         use_wandb = False
         # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
-        main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=128, num_workers=6, activation='relu')
+        main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
+             optimizer_name='Adamax', batch_size=128, num_workers=0, activation='relu')
