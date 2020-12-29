@@ -40,10 +40,6 @@ class VQADataset(Dataset):
         self.read_pt = read_from_tensor_files
         self.load_imgs_to_mem = force_mem
 
-        self.resize_to_224()  # TODO
-        print(f'exiting {self.phase}')
-        exit()
-
         if create_imgs_tensors:  # one time creation of img tensors resized
             self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.save_imgs_tensors()
@@ -58,14 +54,14 @@ class VQADataset(Dataset):
             self.images_tensors = dict()
             self.read_images()
 
-    def resize_to_224(self):
-        resize = transforms.Resize(size=(224, 224))
-        for image_id in set([q['image_id'] for q in self.questions]):
-            path = os.path.join(self.img_path, f'{self.phase}2014',
-                                f'COCO_{self.phase}2014_{str(image_id).zfill(12)}.pt')
-            img = torch.load(path)
-            os.remove(path)
-            torch.save(TF.to_tensor(resize(TF.to_pil_image(img.to(dtype=torch.float32)))).to(dtype=torch.float16), path)
+    # def resize_to_224(self):
+    #     resize = transforms.Resize(size=(224, 224))
+    #     for image_id in set([q['image_id'] for q in self.questions]):
+    #         path = os.path.join(self.img_path, f'{self.phase}2014',
+    #                             f'COCO_{self.phase}2014_{str(image_id).zfill(12)}.pt')
+    #         img = torch.load(path)
+    #         os.remove(path)
+    #         torch.save(TF.to_tensor(resize(TF.to_pil_image(img.to(dtype=torch.float32)))).to(dtype=torch.float16),path)
 
     def read_images(self):
         print(f'reading {self.phase} images to RAM')
@@ -79,6 +75,7 @@ class VQADataset(Dataset):
                 print(f'{self.phase}, len(self.images_tensors) = {len(self.images_tensors)}')
 
     def save_imgs_tensors(self):
+        resize = transforms.Resize(size=(224, 224))
         for img_id in self.imgs_ids:
             # the image .jpg path contains 12 chars for image id
             image_id = str(img_id).zfill(12)
@@ -86,7 +83,6 @@ class VQADataset(Dataset):
             image = Image.open(image_path).convert('RGB')
 
             # Resize
-            resize = transforms.Resize(size=(299, 299))
             image = resize(image)
 
             # this also divides by 255
@@ -170,20 +166,20 @@ if __name__ == '__main__':
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         images_path = 'data/images'
 
-    num_workers = 12 if running_on_linux else 0
+    num_workers = 0 if running_on_linux else 0
 
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
-                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                   force_mem=True)
+                                   phase='train', create_imgs_tensors=True, read_from_tensor_files=True,
+                                   force_mem=False)
     train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
                                   collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path=val_questions_json_path,
                                  images_path=images_path,
-                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=True, force_mem=True)
+                                 phase='val', create_imgs_tensors=True, read_from_tensor_files=True, force_mem=False)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False,
                                 collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
