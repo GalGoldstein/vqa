@@ -13,6 +13,7 @@ import gru
 import pickle
 import platform
 import time
+import gc
 
 
 class VQA(nn.Module):
@@ -387,21 +388,23 @@ if __name__ == '__main__':
 
         torch.cuda.empty_cache()
         # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
-        rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-        resource.setrlimit(resource.RLIMIT_NOFILE, (8192, rlimit[1]))
+        # rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+        # resource.setrlimit(resource.RLIMIT_NOFILE, (8192, rlimit[1]))
         # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
-        torch.multiprocessing.set_sharing_strategy('file_system')
-
+        # torch.multiprocessing.set_sharing_strategy('file_system')
+        gc.collect()
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/home/student/HW2',
                                        phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
                                        force_mem=True)
+        gc.collect()
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
                                      force_mem=True)
+        gc.collect()
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True

@@ -60,11 +60,13 @@ class VQADataset(Dataset):
         for image_id in image_ids:
             # full path to image
             # the image .jpg path contains 12 chars for image id
-            image_id = str(image_id).zfill(12)
-            image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.pt')
-            img = TF.to_pil_image(torch.load(image_path).to(dtype=torch.float32))
-            self.images_tensors[int(image_id)] = TF.to_tensor(resize(img)).to(dtype=torch.float16)
-            del img
+            path = os.path.join(self.img_path, f'{self.phase}2014',
+                                f'COCO_{self.phase}2014_{str(image_id).zfill(12)}.pt')
+            self.images_tensors[int(image_id)] = TF.to_tensor(
+                resize(TF.to_pil_image(torch.load(path).to(dtype=torch.float32)))).to(dtype=torch.float16)
+            if len(self.images_tensors) % 5000 == 0:
+                print(f'{self.phase}, len(self.images_tensors) = {len(self.images_tensors)}')
+        del image_ids
 
     def save_imgs_tensors(self):
         for img_id in self.imgs_ids:
