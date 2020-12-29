@@ -15,10 +15,6 @@ import platform
 import time
 
 
-def identity(x):
-    return x
-
-
 class VQA(nn.Module):
     def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int, padding: int,
                  dropout: float, pooling: str, activation: str):
@@ -244,9 +240,9 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         batch_size = batch_size if running_on_linux else 96
         num_workers = num_workers if running_on_linux else 0
         train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                      collate_fn=identity, drop_last=False)
+                                      collate_fn=lambda x: x, drop_last=False)
         val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                    collate_fn=identity, drop_last=False)
+                                    collate_fn=lambda x: x, drop_last=False)
 
         word_embd_dim = 300
         img_feature_dim = 256
@@ -396,16 +392,16 @@ if __name__ == '__main__':
         torch.cuda.empty_cache()
         # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
         rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-        resource.setrlimit(resource.RLIMIT_NOFILE, (2048, rlimit[1]))
+        resource.setrlimit(resource.RLIMIT_NOFILE, (8192, rlimit[1]))
         # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
-        torch.multiprocessing.set_sharing_strategy('file_system')
+        # torch.multiprocessing.set_sharing_strategy('file_system')
 
         # it taked 40 minutes to upload all validation set to RAM
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=True)  # Force reading validation images to RAM
+                                     force_mem=False)  # Force reading validation images to RAM
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
@@ -464,4 +460,4 @@ if __name__ == '__main__':
         use_wandb = False
         # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
         main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=128, num_workers=10, activation='relu')
+             optimizer_name='Adamax', batch_size=256, num_workers=5, activation='relu')
