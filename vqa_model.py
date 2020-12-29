@@ -206,7 +206,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
 
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
-         num_workers=0, activation='relu'):
+         num_workers=6, activation='relu'):
     # compute_targets(dir='datashare')
     global vqa_train_dataset
     global vqa_val_dataset
@@ -235,7 +235,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
         batch_size = batch_size if running_on_linux else 96
         num_workers = num_workers if running_on_linux else 0
-        train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
+        train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True,
                                       collate_fn=lambda x: x, drop_last=False)
         val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                     collate_fn=lambda x: x, drop_last=False)
@@ -295,7 +295,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
               f'activation = {activation}\n'
               f'dropout probability = {model.dropout_p}\n'
               f'target_type = {model.target_type}\n'
-              f'num_workers = {num_workers}\n'
+              f'num_workers (val only) = {num_workers}\n'
               f'Image model = {model.cnn._get_name()}\n'
               f'Question model = {model.gru._get_name()}\n'
               f'optimizer = {optimizer.__str__()}\n')
@@ -303,6 +303,15 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         last_epoch_loss = np.inf
         epochs = 4
         count_no_improvement = 0
+
+        # TODO
+        print(time.time())
+        print('start val')
+        cur_epoch_loss, val_loss_didnt_improve, val_acc = \
+                evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+        print('end val')
+        print(time.time())
+        exit(777)
 
         for epoch in range(epochs):
             train_epoch_losses = list()
@@ -390,7 +399,7 @@ if __name__ == '__main__':
         rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
         resource.setrlimit(resource.RLIMIT_NOFILE, (8192, rlimit[1]))
         # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
-        # torch.multiprocessing.set_sharing_strategy('file_system')  # TODO
+        torch.multiprocessing.set_sharing_strategy('file_system')
 
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
@@ -460,4 +469,4 @@ if __name__ == '__main__':
         use_wandb = False
         # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
         main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=128, num_workers=0, activation='relu')
+             optimizer_name='Adamax', batch_size=128, num_workers=6, activation='relu')
