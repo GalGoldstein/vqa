@@ -218,7 +218,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 # nohup python -u vqa_model.py > 1.out&
 
 
-def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
+def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
          num_workers=0, activation='relu'):
     # compute_targets(dir='datashare')  # TODO uncomment
     # comment next 3 if doesn't want to use wandb
@@ -247,13 +247,6 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
             label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
-        batch_size = batch_size if running_on_linux else 96
-        num_workers = num_workers if running_on_linux else 0
-        train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                      collate_fn=lambda x: x, drop_last=False)
-        val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                    collate_fn=lambda x: x, drop_last=False)
-
         word_embd_dim = 300
         img_feature_dim = 256
         GRU_layers = 1
@@ -277,7 +270,16 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             pooling = run.config.pooling  # 'max' or 'avg'
             lr = run.config.lr
             activation = run.config.activation  # 'relu' or 'selu'
+            batch_size = run.config.batchsize
         # ....................................................................
+
+        batch_size = batch_size if running_on_linux else 96
+        num_workers = num_workers if running_on_linux else 0
+        train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
+                                      collate_fn=lambda x: x, drop_last=False)
+        val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
+                                    collate_fn=lambda x: x, drop_last=False)
+
 
         gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
                        'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
@@ -402,6 +404,10 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
 
 if __name__ == '__main__':
+    while os.system("ps -o cmd= {}".format(9029)) != 256:
+        print('waiting..')
+        time.sleep(60)
+
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
@@ -454,6 +460,9 @@ if __name__ == '__main__':
                 },
                 'activation': {
                     'values': ['relu']
+                },
+                'batchsize': {
+                    'values': [64, 128]
                 }
             }
         }
