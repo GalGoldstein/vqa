@@ -1,7 +1,9 @@
 import torch
 import platform
 import torch.nn as nn
+import random
 from torch.utils.data import DataLoader
+import torchvision.transforms.functional as TF
 
 """
 https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
@@ -38,9 +40,11 @@ class CNN(nn.Module):
             nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
         )
 
-    def forward(self, x):
+    def forward(self, x, phase='val'):
         with torch.cuda.amp.autocast():
-            x = self.convolutions(x)  # x.shape =  [batch_size, 3, 299, 299]
+            if phase == 'train' and random.random() > 0.5:
+                x = TF.hflip(x)  # horizontal flip augmentation. (!) only works with x.device == 'cuda:0'
+            x = self.convolutions(x)  # x.shape =  [batch_size, 3, 299, 299] - changed to 224 next comments not accurate
             x = x.permute(0, 2, 3, 1)  # [batch_size, 256, 5, 5] -> [batch_size, 5, 5, 256]
             x = x.reshape([x.size(0), x.size(1) * x.size(2), -1])  # [batch_size, 5, 5, 256]  -> [batch_size, 25, 256]
             return x  # [batch_size, 25, 256]. 25=K=Number of regions, 256=d=Dimension of each region
@@ -58,23 +62,18 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     cnn = CNN(padding=2, pooling='max').to(device)
 
-    # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(xception.parameters())])
-    # print(f'============ # Xception parameters: {n_params}============')
-    # n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(mobilenetv2.parameters())])
-    # print(f'============ # MobileNetV2 parameters: {n_params}============')
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(cnn.parameters())])
     print(f'============ # CNN parameters: {n_params}============')
 
-    with torch.cuda.amp.autocast():
-        for i_batch, batch in enumerate(train_dataloader):
-            """processing for a single image"""
-            image = batch[0]['image']
-            single_image_output = cnn(image[None, ...].to(device))
+    for i_batch, batch in enumerate(train_dataloader):
+        """processing for a single image"""
+        image = batch[0]['image']
+        single_image_output = cnn(image[None, ...].to(device), phase='train')
 
-            """processing for a batch"""
-            # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
-            images_batch = torch.stack([sample['image'] for sample in batch], dim=0)
-            batch_image_output = cnn(images_batch)
-            # print(i_batch, batch)
-            breakpoint()
-            break
+        """processing for a batch"""
+        # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
+        images_batch = torch.stack([sample['image'] for sample in batch], dim=0)
+        batch_image_output = cnn(images_batch.to(device), phase='train')
+        # print(i_batch, batch)
+        breakpoint()
+        break

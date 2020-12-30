@@ -91,9 +91,9 @@ class VQA(nn.Module):
 
         return idx_questions_without_answers, torch.stack(targets, dim=0).to(self.device)
 
-    def forward(self, images_batch, questions_batch):
+    def forward(self, images_batch, questions_batch, phase='val'):
         # images_representation shape [batch_size , k , d] where k = number regions of image, d = dim of every feature
-        images_representation = self.cnn(images_batch)
+        images_representation = self.cnn(images_batch, phase)
         questions_last_hidden = [self.gru(self.gru.words_to_idx(question)) for question in questions_batch]
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
@@ -148,7 +148,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
             questions_batch = [sample['question'] for idx, sample in enumerate(batch)
                                if idx not in idx_questions_without_answers]
 
-            output = model(images_batch, questions_batch)
+            output = model(images_batch, questions_batch, phase='val')
             loss = criterion(output, target)
             epoch_losses.append(float(loss))
 
@@ -207,7 +207,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
          num_workers=0, activation='relu'):
-    # compute_targets(dir='datashare')  # TODO
+    # compute_targets(dir='datashare')  # TODO uncomment
     global vqa_train_dataset
     global vqa_val_dataset
     global use_wandb
@@ -332,7 +332,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
                 questions_batch_ = [sample['question'] for idx, sample in enumerate(batch)
                                     if idx not in idx_questions_without_answers]
 
-                output = model(images_batch_, questions_batch_)
+                output = model(images_batch_, questions_batch_, phase='train')  # phase='train' hflip with p=0.5
                 loss = criterion(output, target)
                 loss.backward()
 
@@ -362,6 +362,12 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             if use_wandb:
                 wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
+            # TODO uncomment for the last configuration
+            # train_cur_epoch_loss, _, train_acc = \
+            #     evaluate(train_dataloader, model, criterion, last_epoch_loss, vqa_train_dataset)
+            # if use_wandb:
+            #     wandb.log({"Train Accuracy": train_acc, "Train Loss": train_cur_epoch_loss, "epoch": epoch + 1})
+
             if val_loss_didnt_improve:
                 count_no_improvement += 1
                 print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
@@ -383,14 +389,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
 if __name__ == '__main__':
     if 'Linux' in platform.platform():
-        import resource
-
         torch.cuda.empty_cache()
-        # https://github.com/pytorch/pytorch/issues/973#issuecomment-346405667
-        # rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-        # resource.setrlimit(resource.RLIMIT_NOFILE, (8192, rlimit[1]))
-        # from: https://discuss.pytorch.org/t/runtimeerror-received-0-items-of-ancdata/4999/3
-        # torch.multiprocessing.set_sharing_strategy('file_system')
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/home/student/HW2',
