@@ -1,9 +1,6 @@
 import torch
-import platform
 import torch.nn as nn
-import random
 from torch.utils.data import DataLoader
-import torchvision.transforms.functional as TF
 
 """
 https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
@@ -14,9 +11,7 @@ class CNN(nn.Module):
     def __init__(self, padding=0, pooling='max'):
         super(CNN, self).__init__()
 
-        running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         # formula to calc length (or width) of tensor after the conv layer:
         # (2 * padding_value) + previous_len_of_row_before_conv_layer - (kernel_size - 1) = len_of_row_after_conv_layer
@@ -48,10 +43,8 @@ class CNN(nn.Module):
             # number of filters (which is depth of tensor, which is output value of the last conv layer
         )
 
-    def forward(self, x, phase='val'):
+    def forward(self, x):
         with torch.cuda.amp.autocast():
-            if phase == 'train' and random.random() > 0.5:  # we want augmentation only on train
-                x = TF.hflip(x)  # horizontal flip augmentation. (!) only works with x.device == 'cuda:0'
             x = self.convolutions(x)  # x.shape =  [batch_size, 3, 224, 224]
             x = x.permute(0, 2, 3, 1)  # [batch_size, 256, 5, 5] -> [batch_size, 5, 5, 256]
             x = x.reshape([x.size(0), x.size(1) * x.size(2), -1])  # [batch_size, 5, 5, 256]  -> [batch_size, 25, 256]
@@ -76,11 +69,11 @@ if __name__ == "__main__":
     for i_batch, batch in enumerate(train_dataloader):
         """processing for a single image"""
         image = batch[0]['image']
-        single_image_output = cnn(image[None, ...].to(device), phase='train')
+        single_image_output = cnn(image[None, ...].to(device))
 
         """processing for a batch"""
         # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
         images_batch = torch.stack([sample['image'] for sample in batch], dim=0)
-        batch_image_output = cnn(images_batch.to(device), phase='train')
+        batch_image_output = cnn(images_batch.to(device))
         breakpoint()
         break

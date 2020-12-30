@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from dataset import VQADataset
 from compute_softscore import compute_targets
 from torch.nn.utils.weight_norm import weight_norm
+import torchvision
 import numpy as np
 import cnn
 import gru
@@ -37,7 +38,7 @@ class VQA(nn.Module):
         self.cnn = cnn.CNN(padding=padding, pooling=pooling).to(self.device)
         self.padding = padding
         self.pooling = pooling
-
+        self.flip = torchvision.transforms.RandomHorizontalFlip(p=0.5)
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
                            gru_params['train_question_path']).to(self.device)
         self.word_embd_dim = gru_params['word_embd_dim']
@@ -103,9 +104,9 @@ class VQA(nn.Module):
 
         return idx_questions_without_answers, torch.stack(targets, dim=0).to(self.device)
 
-    def forward(self, images_batch, questions_batch, phase='val'):
+    def forward(self, images_batch, questions_batch):
         # images_representation shape [batch_size , k , d] where k = number regions of image, d = dim of every feature
-        images_representation = self.cnn(images_batch, phase)
+        images_representation = self.cnn(images_batch)
         questions_last_hidden = [self.gru(self.gru.words_to_idx(question)) for question in questions_batch]
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
@@ -160,7 +161,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
             questions_batch = [sample['question'] for idx, sample in enumerate(batch)
                                if idx not in idx_questions_without_answers]
 
-            output = model(images_batch, questions_batch, phase='val')
+            output = model(images_batch, questions_batch)
             loss = criterion(output, target)
             epoch_losses.append(float(loss))
 
@@ -337,15 +338,15 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
                     idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
 
                 # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
-                images_batch_ = torch.stack([sample['image'] for idx, sample in enumerate(batch)
-                                             if idx not in idx_questions_without_answers], dim=0).to(model.device)
+                images_batch_ = torch.stack([model.flip(sample['image'].cuda()) for idx, sample in enumerate(batch)
+                                             if idx not in idx_questions_without_answers], dim=0)
 
                 # questions
                 # Natural language e.g. questions_batch_ = ['How many dogs?'...]
                 questions_batch_ = [sample['question'] for idx, sample in enumerate(batch)
                                     if idx not in idx_questions_without_answers]
 
-                output = model(images_batch_, questions_batch_, phase='train')  # phase='train' hflip with p=0.5
+                output = model(images_batch_, questions_batch_)
                 loss = criterion(output, target)
                 loss.backward()
 
@@ -375,7 +376,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             if use_wandb:
                 wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
-            # TODO uncomment for the last configuration
+            # TODO uncomment for the last configuration !
             # train_cur_epoch_loss, _, train_acc = \
             #     evaluate(train_dataloader, model, criterion, last_epoch_loss, vqa_train_dataset)
             # if use_wandb:
@@ -437,7 +438,7 @@ if __name__ == '__main__':
                 },
                 'hidden': {
                     'distribution': 'int_uniform',
-                    'min': 256,
+                    'min': 512,
                     'max': 2048
                 },
                 'padding': {
