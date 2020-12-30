@@ -103,6 +103,7 @@ class GRU(nn.Module):
 
 if __name__ == "__main__":
     gru = GRU(100, 1024, 2, 'data/v2_OpenEnded_mscoco_train2014_questions.json')
+    # the ' ' will disappear in words_to_idx since split.(' ')
     out = gru(gru.words_to_idx(' '.join(gru.preprocess_question_string('Where is he looking?'))))
 
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(gru.parameters())])

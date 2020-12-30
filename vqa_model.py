@@ -208,6 +208,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=128,
          num_workers=0, activation='relu'):
     # compute_targets(dir='datashare')  # TODO uncomment
+    # comment next 3 if doesn't want to use wandb
     global vqa_train_dataset
     global vqa_val_dataset
     global use_wandb
