@@ -364,7 +364,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             if use_wandb:
                 wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
-            # TODO uncomment for the last configuration
+            # TODO uncomment for the last configuration !
             # train_cur_epoch_loss, _, train_acc = \
             #     evaluate(train_dataloader, model, criterion, last_epoch_loss, vqa_train_dataset)
             # if use_wandb:
