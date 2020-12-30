@@ -370,10 +370,18 @@ def eval_weights():
                19: '/content/gdrive/MyDrive/vqa_model_epoch_19.pth'}
 
     running_on_linux = 'Linux' in platform.platform()
+    vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
+                                   questions_json_path='/content/v2_OpenEnded_mscoco_train2014_questions.json',
+                                   images_path='/content',
+                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=False)
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path='/content/v2_OpenEnded_mscoco_val2014_questions.json',
                                  images_path='/content',
                                  phase='val', create_imgs_tensors=False, read_from_tensor_files=False)
+
+    train_questions_json_path = '/content/v2_OpenEnded_mscoco_train2014_questions.json'
+    val_questions_json_path = '/content/v2_OpenEnded_mscoco_val2014_questions.json'
+    label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     for epoch, weight in weights.items():
         print(f'======================= epoch {epoch} =======================')
