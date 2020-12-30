@@ -360,7 +360,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
                 evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
 
             if use_wandb:
-                wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss})
+                wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
             if val_loss_didnt_improve:
                 count_no_improvement += 1
@@ -395,12 +395,12 @@ if __name__ == '__main__':
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/home/student/HW2',
                                        phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                       force_mem=False)  # TODO
+                                       force_mem=True)
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=False)  # TODO
+                                     force_mem=True)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
@@ -414,16 +414,14 @@ if __name__ == '__main__':
 
         # define the hyperparameters
         sweep_config = {
-            'method': 'random',
+            'method': 'bayes',
             'metric': {
                 'name': 'Val Accuracy',
                 'goal': 'maximize'
             },
             'parameters': {
                 'dropout': {
-                    'distribution': 'uniform',
-                    'min': 0.0,
-                    'max': 0.4
+                    'values': [0.0, 0.1]
                 },
                 'hidden': {
                     'distribution': 'int_uniform',
@@ -467,12 +465,12 @@ if __name__ == '__main__':
         sweep_config = {
             'method': 'grid',
             'metric': {'name': 'Val Accuracy', 'goal': 'maximize'},
-            'parameters': {'dropout': {'values': [0]},
-                           'hidden': {'values': [2048]},
-                           'padding': {'values': [2]},
-                           'pooling': {'values': ['max']},
-                           'lr': {'values': [0.002]},
-                           'activation': {'values': ['relu']}}}
+            'parameters': {'dropout': {'values': [None]},
+                           'hidden': {'values': [None]},
+                           'padding': {'values': [None]},
+                           'pooling': {'values': [None]},
+                           'lr': {'values': [None]},
+                           'activation': {'values': [None]}}}
 
         # create new sweep
         sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")
