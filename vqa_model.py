@@ -19,6 +19,18 @@ import time
 class VQA(nn.Module):
     def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int, padding: int,
                  dropout: float, pooling: str, activation: str):
+        """
+        gru_params:{word_embd_dim, question_hidden_dim, GRU_layers, train_questions_json_path}
+        label2ans_path: path to dictionary connecting between answers and their representing indices
+        target_type: soft_scores (can be few possible answers with different scores, to the same question) or
+                    one-hot (the most frequent answer has score of 1, the other have 0)
+        img_feature_dim: depth of output tensor of the cnn. number of different filters.
+        padding: padding size for cnn. if image is 224x224x3, then padding=2 -> regions=5x5, padding=5 -> regions=7x7
+                    when regions means number of squares in original image grid, to do attention on.
+        dropout: probability to dropout on two places: after the element wise product, and before the last fc.
+        pooling: pooling method for the image processing in the cnn network. should be max/average
+        activation: activation function for the whole parts ofthe network (e.g.: ReLU)
+        """
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'

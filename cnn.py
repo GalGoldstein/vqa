@@ -16,7 +16,6 @@ class CNN(nn.Module):
         # formula to calc length (or width) of tensor after the conv layer:
         # (2 * padding_value) + previous_len_of_row_before_conv_layer - (kernel_size - 1) = len_of_row_after_conv_layer
         # for example: 2*2 + 224 - (3 - 1) = 226
-        # ideal padding_value is
         self.convolutions = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3, padding=padding), nn.BatchNorm2d(16), nn.ReLU(),
             nn.Conv2d(16, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
@@ -46,7 +45,7 @@ class CNN(nn.Module):
 
     def forward(self, x):
         with torch.cuda.amp.autocast():
-            x = self.convolutions(x)  # x.shape =  [batch_size, 3, 299, 299] - changed to 224 next comments not accurate
+            x = self.convolutions(x)  # x.shape =  [batch_size, 3, 224, 224]
             x = x.permute(0, 2, 3, 1)  # [batch_size, 256, 5, 5] -> [batch_size, 5, 5, 256]
             x = x.reshape([x.size(0), x.size(1) * x.size(2), -1])  # [batch_size, 5, 5, 256]  -> [batch_size, 25, 256]
             return x  # [batch_size, 25, 256]. 25=K=Number of regions, 256=d=Dimension of each region
@@ -76,6 +75,5 @@ if __name__ == "__main__":
         # stack the images in the batch only to form a [batchsize X 3 X img_size X img_size] tensor
         images_batch = torch.stack([sample['image'] for sample in batch], dim=0)
         batch_image_output = cnn(images_batch.to(device))
-        # print(i_batch, batch)
         breakpoint()
         break

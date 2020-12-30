@@ -90,6 +90,7 @@ def create_dir(path):
 
 
 def get_score(occurences):
+    """ number of occurences of specific answer among the 10 given answers of each question"""
     if occurences == 0:
         return 0
     elif occurences == 1:
@@ -143,8 +144,10 @@ def preprocess_answer(answer):
 
 
 def filter_answers(answers_dset, min_occurence):
-    """This will change the answer to preprocessed version"""
-    occurence = {}
+    """This will change the answer to preprocessed version.
+    we will delete answers that num of appearances as the most frequent answer to a given question, is less than
+    min_occurence"""
+    occurence = {}  # {preprocessed_answer : set(questions_id where this answer appear)}
     for ans_entry in answers_dset:
         gtruth = preprocess_answer(ans_entry['multiple_choice_answer'])
         if gtruth not in occurence:
@@ -197,14 +200,14 @@ def compute_target(answers_dset, ans2label, name, cache_root):
     for ans_entry in answers_dset:
         answers = ans_entry['answers']
         answer_count = {}
-        for answer in answers:
+        for answer in answers: # total of 10 ansewrs per question
             answer_ = answer['answer']
             answer_count[answer_] = answer_count.get(answer_, 0) + 1
 
         labels = []
         scores = []
         for answer in answer_count:
-            if answer not in ans2label:
+            if answer not in ans2label:  # this answer was deleted
                 continue
             labels.append(ans2label[answer])
             score = get_score(answer_count[answer])
@@ -223,6 +226,9 @@ def compute_target(answers_dset, ans2label, name, cache_root):
             'labels': labels,
             'scores': scores
         })
+        # e.g. answer_dict =
+        # {'question_id': 262148002, 'question_type': 'what is', 'image_id': 262148, 'label_counts': {79: 3, 11: 1},
+        #  'labels': [79, 11], 'scores': [0.9, 0.3]}
 
     print(cache_root)
     create_dir(cache_root)
