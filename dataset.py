@@ -26,10 +26,13 @@ class VQADataset(Dataset):
                 e.g. 'v2_OpenEnded_mscoco_val2014_questions.json'
             images_path: (str) path to dir containing 'train2014' and 'val2014' folders
             phase: (str) 'train' / 'val'
+            create_imgs_tensors: whether to replace the jpg files with tensors (pt files)
+            read_from_tensor_files: whether the images are already tensors (pt files)
+            force_mem: upload all images tensors to RAM. can be True only if read_from_tensor_files is True
         """
         self.target = pickle.load(open(target_pickle_path, "rb"))
-        self.questions = json.load(open(questions_json_path))['questions']
-        for question in self.questions:
+        self.questions = json.load(open(questions_json_path))['questions'] # [{question object 1},{question object 2}..]
+        for question in self.questions:  # preprocess each question
             question['question'] = ' '.join(gru.GRU.preprocess_question_string(question['question']))
         self.img_path = images_path
         self.phase = phase
@@ -38,7 +41,7 @@ class VQADataset(Dataset):
 
         if create_imgs_tensors:  # one time creation of img tensors resized
             self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
-            self.save_imgs_tensors()
+            self.save_imgs_tensors()  # create .pt files and delete .jpg files
 
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
@@ -52,6 +55,7 @@ class VQADataset(Dataset):
             self.read_images()
 
     def read_images(self):
+        """ can be used only if images already converted to tensors"""
         print(f'reading {self.phase} images to RAM')
         for image_id in set([q['image_id'] for q in self.questions]):
             # full path to image
@@ -64,6 +68,9 @@ class VQADataset(Dataset):
                 psutil.virtual_memory()
 
     def save_imgs_tensors(self):
+        """
+        take jps original image and resize it, normalize it, and convert it to tensor in float16 (pt file)
+        """
         resize = transforms.Resize(size=(224, 224))
         for img_id in self.imgs_ids:
             # the image .jpg path contains 12 chars for image id
@@ -77,18 +84,18 @@ class VQADataset(Dataset):
             # this also divides by 255
             image = TF.to_tensor(image)
             save_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.pt')
-            torch.save(image.to(dtype=torch.float16), save_path)
+            torch.save(image.to(dtype=torch.float16), save_path)  # original type was float32
             os.remove(image_path)  # delete .jpg file
 
     def load_img_from_path(self, image_path):
-        if self.read_pt:
+        if self.read_pt:  # tensors are already after resize, so we just wantto load
             image = torch.load(image_path)
 
-        else:
+        else: # load images as jpg files
             image = Image.open(image_path).convert('RGB')
 
             # Resize
-            resize = transforms.Resize(size=(299, 299))
+            resize = transforms.Resize(size=(224, 224))
             image = resize(image)
 
             # this also divides by 255
@@ -102,7 +109,7 @@ class VQADataset(Dataset):
     def __getitem__(self, idx):
         """
             Return a tuple of 3:
-            (image as tensor, question string, answer)
+            (image as tensor, question string, answer_dict)
 
             References:
                 1. https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
@@ -123,16 +130,16 @@ class VQADataset(Dataset):
         extension = 'pt' if self.read_pt else 'jpg'
         image_path = os.path.join(self.img_path, f'{self.phase}2014', f'COCO_{self.phase}2014_{image_id}.{extension}')
 
-        if self.load_imgs_to_mem:  # load the image from RAM
+        if self.load_imgs_to_mem:  # the images already as tensors on the RAM
             image_tensor = self.images_tensors[int(image_id)]
 
-        else:
+        else:  # we will load the jpg file and convert it to tensor TODO Yotam to look at
             for i in range(10):
                 try:  # full path to image
                     image_tensor = self.load_img_from_path(image_path)
                     break
 
-                except Exception as e:
+                except Exception as e:  # TODO Yotam to look at
                     print(f'{e}\n')
                     print(f'Failed in __getitem__ ... trying to load again\n'
                           f'image path: {image_path}\n')
@@ -146,7 +153,7 @@ if __name__ == '__main__':
     if running_on_linux:
         train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
-        images_path = '/home/student/HW2'
+        images_path = '/home/student/HW2' # we moved the images from '/datashare' for faster reading, regardless the convert to tensors idea
     else:
         train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
@@ -158,8 +165,8 @@ if __name__ == '__main__':
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
                                    phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                   force_mem=False)
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,
+                                   force_mem=False)  # TODO GAL what are the running options
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,  # TODO GAL what is the chosen batch_size?
                                   collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
 
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
