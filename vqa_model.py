@@ -276,7 +276,7 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
         criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
         # initial_lr = None
-        patience = 4  # how many epochs without val loss improvement to stop training
+        patience = 7  # how many epochs without val loss improvement to stop training
         optimizer = optim.Adamax(model.parameters(), lr=lr) if optimizer_name == 'Adamax' else optim.Adadelta(
             model.parameters())
 
@@ -395,12 +395,12 @@ if __name__ == '__main__':
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/home/student/HW2',
                                        phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                       force_mem=True)
+                                       force_mem=False)  # TODO
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=True)
+                                     force_mem=False)  # TODO
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
@@ -419,10 +419,6 @@ if __name__ == '__main__':
                 'name': 'Val Accuracy',
                 'goal': 'maximize'
             },
-            'early_terminate': {
-                'type': 'hyperband',
-                'min_iter': 3
-            },
             'parameters': {
                 'dropout': {
                     'distribution': 'uniform',
@@ -430,7 +426,9 @@ if __name__ == '__main__':
                     'max': 0.4
                 },
                 'hidden': {
-                    'values': [512, 1024]
+                    'distribution': 'int_uniform',
+                    'min': 256,
+                    'max': 2048
                 },
                 'padding': {
                     'values': [2, 5]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
@@ -440,11 +438,11 @@ if __name__ == '__main__':
                 },
                 'lr': {
                     'distribution': 'uniform',
-                    'min': 0.001,
-                    'max': 0.004
+                    'min': 0.002,
+                    'max': 0.01
                 },
                 'activation': {
-                    'values': ['relu', 'selu']
+                    'values': ['relu']
                 }
             }
         }
@@ -456,7 +454,28 @@ if __name__ == '__main__':
         wandb.agent(sweep_id, function=main)
 
     else:  # run this code with "python vqa_model.py"
-        use_wandb = False
-        # 128 * 10 is good for 512 and pad=0 and also 1024 and pad=2
-        main(question_hidden_dim=1024, padding=2, dropout_p=0.0, pooling='max',
-             optimizer_name='Adamax', batch_size=128, num_workers=0, activation='relu')
+        use_wandb = True
+        import logging
+        import wandb
+
+        logging.propagate = False
+        logging.getLogger().setLevel(logging.ERROR)
+        torch.manual_seed(42)  # pytorch random seed
+        torch.backends.cudnn.deterministic = True
+
+        # TODO put here the chosen configuration
+        sweep_config = {
+            'method': 'grid',
+            'metric': {'name': 'Val Accuracy', 'goal': 'maximize'},
+            'parameters': {'dropout': {'values': [0]},
+                           'hidden': {'values': [2048]},
+                           'padding': {'values': [2]},
+                           'pooling': {'values': ['max']},
+                           'lr': {'values': [0.002]},
+                           'activation': {'values': ['relu']}}}
+
+        # create new sweep
+        sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")
+
+        # run the agent to execute the code
+        wandb.agent(sweep_id, function=main)
