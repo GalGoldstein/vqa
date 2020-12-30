@@ -42,6 +42,7 @@ class VQADataset(Dataset):
 
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
+            # [-15:-3] for .pt files [-16:-4] fro .jpg files
             images = [int(s[-15:-3]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
@@ -93,9 +94,6 @@ class VQADataset(Dataset):
             # this also divides by 255
             image = TF.to_tensor(image)
 
-        # horizontal flip augmentation  TODO - cannot do this to float16
-        # if self.phase == 'train' and random.random() > 0.5:
-        #     image = TF.hflip(image)
         return image
 
     def __len__(self):
