@@ -280,7 +280,6 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
                                     collate_fn=lambda x: x, drop_last=False)
 
-
         gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
                        'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
 
@@ -407,6 +406,8 @@ if __name__ == '__main__':
     while os.system("ps -o cmd= {}".format(9029)) != 256:
         print('waiting..')
         time.sleep(60)
+
+    time.sleep(60)
 
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
