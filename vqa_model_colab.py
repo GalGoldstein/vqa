@@ -370,11 +370,11 @@ def eval_weights():
                19: '/content/gdrive/MyDrive/vqa_model_epoch_19.pth'}
 
     running_on_linux = 'Linux' in platform.platform()
-
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
-                                 questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
-                                 images_path='/datashare',
+                                 questions_json_path='/content/v2_OpenEnded_mscoco_val2014_questions.json',
+                                 images_path='/content',
                                  phase='val', create_imgs_tensors=False, read_from_tensor_files=False)
+
     for epoch, weight in weights.items():
         print(f'======================= epoch {epoch} =======================')
         batch_size = 128 if running_on_linux else 96
