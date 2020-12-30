@@ -361,6 +361,34 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         torch.cuda.empty_cache()
 
 
+def eval_weights():
+    compute_targets(dir='content')
+
+    weights = {13: '/content/gdrive/MyDrive/vqa_model_epoch_13.pth',
+               15: '/content/gdrive/MyDrive/vqa_model_epoch_15.pth',
+               17: '/content/gdrive/MyDrive/vqa_model_epoch_17.pth',
+               19: '/content/gdrive/MyDrive/vqa_model_epoch_19.pth'}
+
+    running_on_linux = 'Linux' in platform.platform()
+
+    vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
+                                 questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
+                                 images_path='/datashare',
+                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=False)
+    for epoch, weight in weights.items():
+        print(f'======================= epoch {epoch} =======================')
+        batch_size = 128 if running_on_linux else 96
+        num_workers = 4 if running_on_linux else 0
+        val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
+                                    collate_fn=lambda x: x, drop_last=False)
+
+        model = torch.load(weight)
+
+        criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
+        cur_epoch_loss, loss_not_improved, acc = evaluate(val_dataloader, model, criterion, np.inf, vqa_val_dataset)
+        print(f'epoch {epoch}, acc = {acc}, loss = {cur_epoch_loss}')
+
+
 if __name__ == '__main__':
     # import cProfile
     #
