@@ -78,18 +78,24 @@ class VQA(nn.Module):
     def answers_to_one_hot(self, answers_labels_batch):
         """
             answers_labels_batch = [{label:count #people chose this label as answer} ... ]
+            return: all_answers, a tensor of labels of the individual correct answers (one for each question)
         """
+        # TODO GAL I dont think we get right the one-hot option. we supposed to change only our predictions method, not real target
         all_answers = list()
         for labels_count_dict in answers_labels_batch:
             if labels_count_dict:  # not empty dict
                 target_class = max(labels_count_dict, key=labels_count_dict.get)  # only the most common answer gets '1'
-            else:
+            else:  # there are no answers for this question
                 target_class = self.num_classes  # last class is used for the questions without an answer
             all_answers.append(target_class)
 
         return torch.tensor(all_answers)
 
     def answers_to_softscore(self, answers_batch, n_classes):
+        """
+            return: targets - tensor in shape [#question - #question_without_answer, n_classes] of the soft scores.
+                    idx_questions_without_answers: questions without answers. not in 'targets' tensor
+        """
         idx_questions_without_answers = list()
         targets = []
         soft_scores = [{k: v for k, v in zip(sample['labels'], sample['scores'])} for sample in answers_batch]
@@ -107,28 +113,29 @@ class VQA(nn.Module):
     def forward(self, images_batch, questions_batch):
         # images_representation shape [batch_size , k , d] where k = number regions of image, d = dim of every feature
         images_representation = self.cnn(images_batch)
+        # GRU supporting only single question and not batch
         questions_last_hidden = [self.gru(self.gru.words_to_idx(question)) for question in questions_batch]
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
         expand_dim = [images_representation.shape[1],  # k
                       questions_representation.shape[0],  # batch_size
-                      questions_representation.shape[1]]  # hidden of question = 512
+                      questions_representation.shape[1]]  # hidden_q
         concat = torch.cat((images_representation, questions_representation.expand(expand_dim).permute(1, 0, 2)),
-                           dim=2)  # [batch_size,k,768]
-        relu_attention = self.relu(self.linear_inside_relu_attention(concat))  # [batch_size,k,512]
+                           dim=2)  # [batch_size,k,hidden_q+d]
+        relu_attention = self.relu(self.linear_inside_relu_attention(concat))  # [batch_size,k,hidden_q]
 
         img_features_weights = self.softmax(self.linear_after_relu_attention(relu_attention))  # [batch_size,k,1]
 
         attention_img_features = torch.mul(img_features_weights, images_representation)  # [batch_size,k,d]
         img_sum_weighted_features = torch.sum(attention_img_features, dim=1)  # [batch_size,d]
 
-        relu_imgs = self.relu(self.linear_inside_relu_image(img_sum_weighted_features))  # [batch_size,512]
+        relu_imgs = self.relu(self.linear_inside_relu_image(img_sum_weighted_features))  # [batch_size,hidden_q]
 
-        relu_questions = self.relu(self.linear_inside_relu_question(questions_representation))  # [batch_size,512]
+        relu_questions = self.relu(self.linear_inside_relu_question(questions_representation))  # [batch_size,hidden_q]
 
-        pointwise_mul = torch.mul(relu_imgs, relu_questions)  # [batch_size,512]
+        pointwise_mul = torch.mul(relu_imgs, relu_questions)  # [batch_size,hidden_q]
 
-        relu_mul_product = self.relu(self.linear_inside_relu_last(self.dropout(pointwise_mul)))  # [batch_size,512]
+        relu_mul_product = self.relu(self.linear_inside_relu_last(self.dropout(pointwise_mul)))  # [batch_size,hidden_q]
 
         return self.fc(self.dropout(relu_mul_product))  # [batch_size,n_classes]
 
