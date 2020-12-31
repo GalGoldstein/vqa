@@ -80,7 +80,6 @@ class VQA(nn.Module):
             answers_labels_batch = [{label:count #people chose this label as answer} ... ]
             return: all_answers, a tensor of labels of the individual correct answers (one for each question)
         """
-        # TODO GAL I dont think we get right the one-hot option. we supposed to change only our predictions method, not real target
         all_answers = list()
         for labels_count_dict in answers_labels_batch:
             if labels_count_dict:  # not empty dict
@@ -141,6 +140,10 @@ class VQA(nn.Module):
 
 
 def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
+    """
+    pass model through forward, without backward. can be done also on the train set, since we need to report measures
+    on train set and on validation set.
+    """
     print(f"============ Evaluating on {'validation' if dataset.phase == 'val' else 'train'} set ============")
     model.eval()
     with torch.no_grad():
@@ -150,34 +153,45 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
             if model.target_type == 'onehot':
                 # answers
                 answers_labels_batch = [sample['answer']['label_counts'] for sample in batch]
-                target = model.answers_to_one_hot(answers_labels_batch).to(model.device)
+                target = model.answers_to_one_hot(answers_labels_batch).to(model.device) # TODO GAL for example here, how did you know to move to to(device)?
 
-                # don't learn from questions without answers
+                # don't learn from questions without answers (mark their indices inside the batch)
+                # torch.nonzero - returns a tensor containing the indices of all non-zero elements of the input
                 idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
                 target = target[target != model.num_classes]
-            else:  # target_type='softscore'
+            else:  # target_type=='softscore'
                 answers = [sample['answer'] for sample in batch]
                 idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
 
-            # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
+            # each sample in batch is: {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
+
+            # filtering questions without answers:
+            # restack the images tensors to form a [batchsize X 3 X img_size X img_size] tensor
             images_batch = torch.stack([sample['image'] for idx, sample in enumerate(batch)
                                         if idx not in idx_questions_without_answers], dim=0).to(model.device)
 
-            # questions
-            # Natural language e.g. questions_batch_ = ['How many dogs?'...]
+            # restack the questions (Natural language e.g. questions_batch_ = ['How many dogs?'...])
             questions_batch = [sample['question'] for idx, sample in enumerate(batch)
                                if idx not in idx_questions_without_answers]
 
+            # output is [batch_size,n_classes] tensors, not yet with probabilistic values
             output = model(images_batch, questions_batch)
+
+            # if 'soft_score': BCE loss, 'output' will pass through sigmoid and then will be compared to 'targets' where
+            #                  values are 0/0.3/0.6/0.9/1
+            # if 'one_hot': Cross entropy loss, 'output' will pass through softmax and then will be compared to
+            #                  'targets' where values are 0's except for one entry.
             loss = criterion(output, target)
             epoch_losses.append(float(loss))
 
+            # our prediction is only one answer, even in the soft-scores case TODO GAL why is that?
             pred = torch.argmax(output, dim=1)
             scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
                       for idx, sample in enumerate(batch) if idx not in idx_questions_without_answers]
 
+            # our accuracy score is according to the soft-scores, even in the one-hot case
             for i, prediction in enumerate(pred):
-                sample_score = scores[i]  # {label: score} dict
+                sample_score = scores[i]  # scores[i] is {label: score} dict
                 if int(prediction) in sample_score:
                     accuracy += sample_score[int(prediction)]
 
@@ -227,7 +241,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
 
 def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
          num_workers=0, activation='relu'):
-    # compute_targets(dir='datashare')  # TODO uncomment
+    # compute_targets(dir='datashare')  # need only once. TODO uncomment
     # comment next 3 if doesn't want to use wandb
     global vqa_train_dataset
     global vqa_val_dataset
@@ -338,22 +352,26 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
                     answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
                     target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
-                    # don't learn from questions without answers
+                    # don't learn from questions without answers (take the batch indices of these questions)
                     idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
                     target = target[target != model.num_classes]
                 else:  # target_type='softscore'
                     answers = [sample['answer'] for sample in batch]
                     idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
 
-                # stack the images in the batch to form a [batchsize X 3 X img_size X img_size] tensor
+                # filtering questions without answers:
+                # restack the images tensors to form a [batchsize X 3 X img_size X img_size] tensor
                 images_batch_ = torch.stack([model.flip(sample['image'].cuda()) for idx, sample in enumerate(batch)
                                              if idx not in idx_questions_without_answers], dim=0)
 
-                # questions
-                # Natural language e.g. questions_batch_ = ['How many dogs?'...]
+                # restack the questions (Natural language e.g. questions_batch_ = ['How many dogs?'...])
                 questions_batch_ = [sample['question'] for idx, sample in enumerate(batch)
                                     if idx not in idx_questions_without_answers]
 
+                # if 'soft_score': BCE loss, 'output' will pass through sigmoid and then will be compared to 'targets'
+                #                  where values are 0/0.3/0.6/0.9/1
+                # if 'one_hot': Cross entropy loss, 'output' will pass through softmax and then will be compared to
+                #               'targets' where values are 0's except for one entry.
                 output = model(images_batch_, questions_batch_)
                 loss = criterion(output, target)
                 loss.backward()
@@ -380,7 +398,6 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             torch.cuda.empty_cache()
             cur_epoch_loss, val_loss_didnt_improve, val_acc = \
                 evaluate(val_dataloader, model, criterion, best_val_loss, vqa_val_dataset)
-
             if use_wandb:
                 wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
@@ -390,6 +407,8 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             # if use_wandb:  # TODO delete the other .log above
             #     wandb.log({"Train Accuracy": train_acc, "Train Loss": train_cur_epoch_loss,
             #                "Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
+
+            # TODO GAL if we want to create charts, we need lists for losses and accuracies
 
             if val_loss_didnt_improve:
                 count_no_improvement += 1

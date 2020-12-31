@@ -6,6 +6,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+
+# TODO GAL: function called "evaluate_hw2()" . The function should load the VQA 2.0 validation set, load
+#  your trained network (you can assume that the model file is located in the script folder) and
+#  return the average accuracy on the val-set. This function should be written in a separate script.
+#  Use this line to load your model:
+#  model.load_state_dict(torch.load('model.pkl',map_location=lambda storage, loc: storage))
 if __name__ == '__main__':
     running_on_linux = 'Linux' in platform.platform()
 
