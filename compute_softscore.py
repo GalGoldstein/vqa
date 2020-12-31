@@ -200,7 +200,7 @@ def compute_target(answers_dset, ans2label, name, cache_root):
     for ans_entry in answers_dset:
         answers = ans_entry['answers']
         answer_count = {}
-        for answer in answers: # total of 10 ansewrs per question
+        for answer in answers:  # total of 10 answers per question
             answer_ = answer['answer']
             answer_count[answer_] = answer_count.get(answer_, 0) + 1
 
