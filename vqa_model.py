@@ -410,12 +410,6 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
 
 if __name__ == '__main__':
-    while os.system("ps -o cmd= {}".format(126145)) != 256:  # TODO delete
-        print('waiting..')
-        time.sleep(60)
-
-    time.sleep(60)
-
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
