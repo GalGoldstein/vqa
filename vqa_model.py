@@ -429,12 +429,6 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
 
 if __name__ == '__main__':
-    while os.system("ps -o cmd= {}".format(9029)) != 256:
-        print('waiting..')
-        time.sleep(60)
-
-    time.sleep(60)
-
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
@@ -460,7 +454,7 @@ if __name__ == '__main__':
 
         # define the hyperparameters
         sweep_config = {
-            'method': 'bayes',
+            'method': 'random',
             'metric': {
                 'name': 'Val Accuracy',
                 'goal': 'maximize'
@@ -470,15 +464,13 @@ if __name__ == '__main__':
                     'values': [0.0, 0.1]
                 },
                 'hidden': {
-                    'distribution': 'int_uniform',
-                    'min': 512,
-                    'max': 2048
+                    'values': [512, 768, 1024, 1280]
                 },
                 'padding': {
-                    'values': [2, 5]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
+                    'values': [2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
                 },
                 'pooling': {
-                    'values': ['max', 'avg']
+                    'values': ['max']
                 },
                 'lr': {
                     'distribution': 'uniform',
@@ -489,7 +481,7 @@ if __name__ == '__main__':
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [64, 128]
+                    'values': [128]
                 }
             }
         }
