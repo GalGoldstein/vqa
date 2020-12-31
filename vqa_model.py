@@ -322,8 +322,8 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
               f'Question model = {model.gru._get_name()}\n'
               f'optimizer = {optimizer.__str__()}\n')
 
-        last_epoch_loss = np.inf
-        epochs = 4
+        best_val_loss = np.inf
+        epochs = 4  # TODO chnage for final run
         count_no_improvement = 0
 
         for epoch in range(epochs):
@@ -379,28 +379,29 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
             torch.cuda.empty_cache()
             cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-                evaluate(val_dataloader, model, criterion, last_epoch_loss, vqa_val_dataset)
+                evaluate(val_dataloader, model, criterion, best_val_loss, vqa_val_dataset)
 
             if use_wandb:
                 wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
             # TODO uncomment for the last configuration !
             # train_cur_epoch_loss, _, train_acc = \
-            #     evaluate(train_dataloader, model, criterion, last_epoch_loss, vqa_train_dataset)
-            # if use_wandb:
-            #     wandb.log({"Train Accuracy": train_acc, "Train Loss": train_cur_epoch_loss, "epoch": epoch + 1})
+            #     evaluate(train_dataloader, model, criterion, best_val_loss, vqa_train_dataset)
+            # if use_wandb:  # TODO delete the other .log above
+            #     wandb.log({"Train Accuracy": train_acc, "Train Loss": train_cur_epoch_loss,
+            #                "Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
             if val_loss_didnt_improve:
                 count_no_improvement += 1
                 print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
             else:
                 count_no_improvement = 0
+                best_val_loss = cur_epoch_loss
 
             print(f"========== Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ========")
             torch.save(model, os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
             torch.cuda.empty_cache()
 
-            last_epoch_loss = cur_epoch_loss
             if count_no_improvement >= patience:
                 print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
                 break
@@ -442,13 +443,15 @@ if __name__ == '__main__':
             },
             'parameters': {
                 'dropout': {
-                    'values': [0.0, 0.1]
+                    'distribution': 'uniform',
+                    'min': 0.0,
+                    'max': 0.1
                 },
                 'hidden': {
                     'values': [512, 768, 1024, 1280]
                 },
                 'padding': {
-                    'values': [2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
+                    'values': [2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224) TODO add 5
                 },
                 'pooling': {
                     'values': ['max']
@@ -456,13 +459,13 @@ if __name__ == '__main__':
                 'lr': {
                     'distribution': 'uniform',
                     'min': 0.002,
-                    'max': 0.01
+                    'max': 0.01  # TODO
                 },
                 'activation': {
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [128]
+                    'values': [128, 256]  # TODO might not work for 256
                 }
             }
         }
