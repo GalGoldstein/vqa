@@ -457,7 +457,7 @@ if __name__ == '__main__':
                     'values': [2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
                 },
                 'pooling': {
-                    'values': ['max', 'avg']
+                    'values': ['max']
                 },
                 'lr': {
                     'distribution': 'uniform',
