@@ -93,7 +93,7 @@ class GRU(nn.Module):
         trimmed = question_word_idx_tensor[:14]
         padding_size = 14 - len(trimmed)
         # add the <pad> index * padding_size in the end of the question. i.e. the ad is only in the end of the q.
-        padded = torch.cat([trimmed, torch.tensor([self.word_idx_mappings['<pad>']] * padding_size).to(self.device)])
+        padded = torch.cat([trimmed, torch.tensor([self.word_idx_mappings['<pad>']] * padding_size)])
         padded = padded.long().to(self.device)  # nn.Embedding expects to long type
         return padded
 
