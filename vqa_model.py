@@ -211,7 +211,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
         vqa_val_dataset.num_classes = model.num_classes
 
         criterion = nn.BCEWithLogitsLoss(reduction='sum')
-        patience = 7  # how many epochs without val loss improvement to stop training
+        patience = 100  # TODO change to 7  # how many epochs without val loss improvement to stop training
         optimizer = optim.Adamax(model.parameters(), lr=lr)
 
         print('============ Starting training ============')
