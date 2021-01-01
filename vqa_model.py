@@ -77,8 +77,7 @@ class VQA(nn.Module):
         # images_representation shape [batch_size , k , d] where k = number regions of image, d = dim of every feature
         images_representation = self.cnn(images_batch)
         # GRU supporting only single question and not batch
-        questions_last_hidden = self.gru(questions_batch)
-        questions_representation = torch.stack(questions_last_hidden, dim=0)
+        questions_representation = self.gru(questions_batch)
 
         expand_dim = [images_representation.shape[1],  # k
                       questions_representation.shape[0],  # batch_size
