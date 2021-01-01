@@ -126,7 +126,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
             pred = torch.argmax(output, dim=1)
 
             for i, prediction in enumerate(pred):
-                accuracy += target[i][int(prediction)]
+                accuracy += float(target[i][int(prediction)])
 
         acc = accuracy / dataset.original_length
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
