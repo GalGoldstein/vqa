@@ -4,7 +4,6 @@ import json
 import pickle
 import platform
 from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
 from PIL import Image
 from torchvision import transforms
 import time
@@ -144,7 +143,7 @@ class VQADataset(Dataset):
         question_dict = self.questions[idx]
         # e.g. question_dict = {'image_id': 262148, 'question': [0, 4, 6, 8] << tensor, 'question_id': 262148000}
         indexed_question = question_dict['question']
-        # e.g. indexed_question = torch.tensor([0, 4, 6, 8, 0, 4, 6, 8, 0, 4, 6, 8, 3, 6]) << original_length 14 always
+        # e.g. indexed_question = torch.tensor([0, 4, 6, 8, 0, 4, 6, 8, 0, 4, 6, 8, 3, 6]) << length 14 always
 
         # the image .jpg path contains 12 chars for image id
         image_id = str(question_dict['image_id']).zfill(12)

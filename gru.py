@@ -34,7 +34,7 @@ class GRU(nn.Module):
         self.word_dict = self.get_vocabs_counts()
         # init word embeddings. if word has less than min_freq appearances, it will get <unk> embedding.
         # <unk> will serve each test sample word that wasn't seen in the train set.
-        # <pad> will serve for padding words, since we pad each question tobe in original_length 14 (=max original_length of all qs)
+        # <pad> will serve for padding words, since we pad each question tobe in length 14 (=max length of all qs)
         vocab = Vocab(Counter(self.word_dict), vectors=None, min_freq=2, specials=['<unk>', '<pad>'])
         # set rand vectors and get the weights (the vector embeddings themselves).
         # it means: create len(vocab.stoi) embeddings, each in dimension of word_embd_dim
@@ -85,7 +85,7 @@ class GRU(nn.Module):
 
     def words_to_idx(self, question: list):
         """
-        return tensor of indexes, with original_length=number of question words. include <unk> index if a word is unrecognized
+        return tensor of indexes, with length=number of question words. include <unk> index if a word is unrecognized
         trim the sentence to max of 14 words and pad it and index it to words
         """
         question_word_idx_tensor = torch.tensor([self.word_idx_mappings[word] if word in self.word_idx_mappings else
