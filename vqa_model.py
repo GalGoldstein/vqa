@@ -37,7 +37,7 @@ class VQA(nn.Module):
         self.cnn = cnn.CNN(padding=padding, pooling=pooling)
         self.padding = padding
         self.pooling = pooling
-        self.flip = torchvision.transforms.RandomHorizontalFlip(p=0.0)  # TODO 0.5 here
+        self.flip = torchvision.transforms.RandomHorizontalFlip(p=0.5)
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
                            gru_params['train_question_path'])
         self.word_embd_dim = gru_params['word_embd_dim']
@@ -129,7 +129,6 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
                 accuracy += float(target[i][int(prediction)])
 
         acc = accuracy / dataset.original_length
-        acc = accuracy / 192  # TODO delete
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
         cur_epoch_loss = float(np.mean(epoch_losses))
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} loss = {round(cur_epoch_loss, 5)}")
@@ -147,7 +146,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
     global vqa_train_dataset
     global vqa_val_dataset
     global use_wandb
-    if True:  # TODO change to try
+    try:
         running_on_linux = 'Linux' in platform.platform()
 
         if running_on_linux:
@@ -212,7 +211,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
         vqa_val_dataset.num_classes = model.num_classes
 
         criterion = nn.BCEWithLogitsLoss(reduction='sum')
-        patience = 200  # TODO change to 7  # how many epochs without val loss improvement to stop training
+        patience = 7  # how many epochs without val loss improvement to stop training
         optimizer = optim.Adamax(model.parameters(), lr=lr)
 
         print('============ Starting training ============')
@@ -234,8 +233,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
               f'optimizer = {optimizer.__str__()}\n')
 
         best_val_loss = np.inf
-        epochs = 200  # TODO change to 35(?) for final run
-        # TODO change to 4
+        epochs = 4  # TODO change to 35(?) for final run
         count_no_improvement = 0
 
         for epoch in range(epochs):
@@ -280,9 +278,8 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
                 wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
             # TODO uncomment for the last configuration !
-            # TODO ############################################ comment this
-            train_cur_epoch_loss, _, train_acc = \
-                evaluate(train_dataloader, model, criterion, best_val_loss, vqa_train_dataset)
+            # train_cur_epoch_loss, _, train_acc = \
+            #     evaluate(train_dataloader, model, criterion, best_val_loss, vqa_train_dataset)
             # if use_wandb:  # TODO delete the other .log above
             #     wandb.log({"Train Accuracy": train_acc, "Train Loss": train_cur_epoch_loss,
             #                "Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
@@ -297,16 +294,15 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
                 best_val_loss = cur_epoch_loss
 
             print(f"========== Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ========")
-            # torch.save(model, os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))  # TODO uncomment
+            torch.save(model, os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
             torch.cuda.empty_cache()
 
             if count_no_improvement >= patience:
                 print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
                 break
-    # TODO uncomment
-    # except Exception as e:
-    #     print(e)
-    #     print(f'ERROR FAILED')
+    except Exception as e:
+        print(e)
+        print(f'ERROR FAILED')
 
 
 if __name__ == '__main__':
@@ -323,10 +319,6 @@ if __name__ == '__main__':
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
                                      force_mem=True)
 
-    use_wandb = False
-    main(question_hidden_dim=1280, padding=5, dropout_p=0.0, pooling='max', batch_size=192, activation='relu')  # TODO
-    exit(1)
-
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
         import logging
@@ -339,7 +331,7 @@ if __name__ == '__main__':
 
         # define the hyperparameters
         sweep_config = {
-            'method': 'random',
+            'method': 'bayes',
             'metric': {
                 'name': 'Val Accuracy',
                 'goal': 'maximize'

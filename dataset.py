@@ -44,10 +44,6 @@ class VQADataset(Dataset):
         self.read_pt = read_from_tensor_files
         self.load_imgs_to_mem = force_mem
 
-        # TODO delete
-        self.target = self.target[:192]
-        self.questions = self.questions[:192]
-
         if create_imgs_tensors:  # one time creation of img tensors resized
             self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.save_imgs_tensors()  # create .pt files and delete .jpg files
