@@ -129,6 +129,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
                 accuracy += float(target[i][int(prediction)])
 
         acc = accuracy / dataset.original_length
+        acc = accuracy / 192  # TODO delete
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
         cur_epoch_loss = float(np.mean(epoch_losses))
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} loss = {round(cur_epoch_loss, 5)}")
@@ -233,7 +234,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
               f'optimizer = {optimizer.__str__()}\n')
 
         best_val_loss = np.inf
-        epochs = 100  # TODO change to 35(?) for final run
+        epochs = 200  # TODO change to 35(?) for final run
         # TODO change to 4
         count_no_improvement = 0
 
