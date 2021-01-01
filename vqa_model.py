@@ -128,7 +128,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
             for i, prediction in enumerate(pred):
                 accuracy += target[i][int(prediction)]
 
-        acc = accuracy / len(dataset.original_length)
+        acc = accuracy / dataset.original_length
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
         cur_epoch_loss = float(np.mean(epoch_losses))
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} loss = {round(cur_epoch_loss, 5)}")
