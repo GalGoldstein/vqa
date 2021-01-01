@@ -34,12 +34,12 @@ class VQA(nn.Module):
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        self.cnn = cnn.CNN(padding=padding, pooling=pooling).to(self.device)
+        self.cnn = cnn.CNN(padding=padding, pooling=pooling)
         self.padding = padding
         self.pooling = pooling
         self.flip = torchvision.transforms.RandomHorizontalFlip(p=0.5)
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
-                           gru_params['train_question_path']).to(self.device)
+                           gru_params['train_question_path'])
         self.word_embd_dim = gru_params['word_embd_dim']
         self.question_hidden_dim = gru_params['question_hidden_dim']
         self.hidden_dim = gru_params['question_hidden_dim']
@@ -78,7 +78,7 @@ class VQA(nn.Module):
         images_representation = self.cnn(images_batch)
         # GRU supporting only single question and not batch
         questions_last_hidden = self.gru(questions_batch)
-        questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
+        questions_representation = torch.stack(questions_last_hidden, dim=0)
 
         expand_dim = [images_representation.shape[1],  # k
                       questions_representation.shape[0],  # batch_size
@@ -114,9 +114,9 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
         accuracy = 0
         epoch_losses = list()
         for i_batch, batch in enumerate(dataloader):
-            images_batch = batch['image']
-            questions_batch = ['question']
-            target = batch['answer']  # in soft score
+            images_batch = batch['image'].cuda()
+            questions_batch = ['question'].cuda()
+            target = batch['answer'].cuda()  # in soft score
 
             # output is [batch_size,n_classes] tensors, not yet with probabilistic values
             # 'output' will pass through sigmoid and then will be compared to 'targets' where values are 0/0.3/0.6/0.9/1
@@ -246,9 +246,9 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             for i_batch, batch in enumerate(train_dataloader):
                 optimizer.zero_grad()
 
-                images_batch_ = batch['image']
-                questions_batch_ = batch['question']
-                target = batch['answer']
+                images_batch_ = batch['image'].cuda()
+                questions_batch_ = batch['question'].cuda()
+                target = batch['answer'].cuda()
 
                 output = model(images_batch_, questions_batch_)
                 loss = criterion(output, target)

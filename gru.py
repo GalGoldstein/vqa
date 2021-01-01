@@ -94,7 +94,7 @@ class GRU(nn.Module):
         padding_size = 14 - len(trimmed)
         # add the <pad> index * padding_size in the end of the question. i.e. the ad is only in the end of the q.
         padded = torch.cat([trimmed, torch.tensor([self.word_idx_mappings['<pad>']] * padding_size)])
-        padded = padded.long().to(self.device)  # nn.Embedding expects to long type
+        padded = padded.long()  # nn.Embedding expects to long type
         return padded
 
     def forward(self, questions_batch):
@@ -102,7 +102,7 @@ class GRU(nn.Module):
         word_embeddings = self.word_embedding(questions_batch)
         output, _ = self.encoder(word_embeddings)
         last_hidden = output.permute(1, 0, 2)[-1]  # take for every question the last hidden
-        return last_hidden.to(self.device)  # return only last hidden state, of the last layer of GRU
+        return last_hidden  # return only last hidden state, of the last layer of GRU
 
 
 if __name__ == "__main__":
