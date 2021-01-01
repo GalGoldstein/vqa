@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import platform
 
 """
 https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from-scratch-using-pytorch-d9eeb7039c12
@@ -12,8 +13,10 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
 
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        running_on_linux = 'Linux' in platform.platform()
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        # formula to calc length (or width) of tensor after the conv layer:
+        # formula to calc original_length (or width) of tensor after the conv layer:
         # (2 * padding_value) + previous_len_of_row_before_conv_layer - (kernel_size - 1) = len_of_row_after_conv_layer
         # for example: 2*2 + 224 - (3 - 1) = 226
         self.convolutions = nn.Sequential(

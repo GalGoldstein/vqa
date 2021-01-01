@@ -26,7 +26,7 @@ class GRU(nn.Module):
 
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.train_question_path = train_question_path
 
@@ -34,7 +34,7 @@ class GRU(nn.Module):
         self.word_dict = self.get_vocabs_counts()
         # init word embeddings. if word has less than min_freq appearances, it will get <unk> embedding.
         # <unk> will serve each test sample word that wasn't seen in the train set.
-        # <pad> will serve for padding words, since we pad each question tobe in length 14 (=max length of all qs)
+        # <pad> will serve for padding words, since we pad each question tobe in original_length 14 (=max original_length of all qs)
         vocab = Vocab(Counter(self.word_dict), vectors=None, min_freq=2, specials=['<unk>', '<pad>'])
         # set rand vectors and get the weights (the vector embeddings themselves).
         # it means: create len(vocab.stoi) embeddings, each in dimension of word_embd_dim
@@ -63,6 +63,7 @@ class GRU(nn.Module):
         # if we still have a number in a word conver it to general number '<number>'
         result = [('<number>' if any(char.isdigit() for char in word) else re.sub(r'[\W_]+', '', word))
                   for word in words]
+
         return result
 
     def get_vocabs_counts(self):
@@ -82,29 +83,36 @@ class GRU(nn.Module):
                         word_dict[word] = 1
         return word_dict
 
-    def words_to_idx(self, sentence: str):
+    def words_to_idx(self, question: list):
         """
-        return tensor of indexes, with length=number of question words. include <unk> index if a ord is unrecognized
+        return tensor of indexes, with original_length=number of question words. include <unk> index if a word is unrecognized
+        trim the sentence to max of 14 words and pad it and index it to words
         """
-        question = sentence.split(' ')
         question_word_idx_tensor = torch.tensor([self.word_idx_mappings[word] if word in self.word_idx_mappings else
                                                  self.word_idx_mappings['<unk>'] for word in question])
-        return question_word_idx_tensor.to(self.device)
-
-    def forward(self, word_idx_tensor):
-        trimmed = word_idx_tensor[:14]  # this is not really cut the tensor since no question is longer than 14
+        trimmed = question_word_idx_tensor[:14]
         padding_size = 14 - len(trimmed)
         # add the <pad> index * padding_size in the end of the question. i.e. the ad is only in the end of the q.
         padded = torch.cat([trimmed, torch.tensor([self.word_idx_mappings['<pad>']] * padding_size).to(self.device)])
-        word_embeddings = self.word_embedding(padded.long())  # nn.Embedding expects to long type
-        output, _ = self.encoder(word_embeddings[None, ...])  # supporting only single question and not batch
-        return output[0][-1].to(self.device)  # return only last hidden state, of the last layer of GRU
+        padded = padded.long().to(self.device)  # nn.Embedding expects to long type
+        return padded
+
+    def forward(self, questions_batch):
+        # questions_batch: [batch_size, 14] for the 14 words indexes of the question (tensor of long type)
+        word_embeddings = self.word_embedding(questions_batch)
+        output, _ = self.encoder(word_embeddings)
+        last_hidden = output.permute(1, 0, 2)[-1]  # take for every question the last hidden
+        return last_hidden.to(self.device)  # return only last hidden state, of the last layer of GRU
 
 
 if __name__ == "__main__":
-    gru = GRU(100, 1024, 2, 'data/v2_OpenEnded_mscoco_train2014_questions.json')
-    # the ' ' will disappear in words_to_idx since split.(' ')
-    out = gru(gru.words_to_idx(' '.join(gru.preprocess_question_string('Where is he looking?'))))
+    # test gru module
+    gru = GRU(word_embd_dim=300, hidden_dim=512, n_layers=1,
+              train_question_path='data/v2_OpenEnded_mscoco_train2014_questions.json')
+    batch_size = 16
+    max_question_len = 14
+    questions_batch = torch.randint(low=0, high=100, size=(batch_size, max_question_len)).to(dtype=torch.long)
+    out = gru(questions_batch)
 
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(gru.parameters())])
     print(f'============ # GRU Parameters: {n_params}============')

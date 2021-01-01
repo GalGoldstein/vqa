@@ -6,7 +6,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-
 # TODO GAL: function called "evaluate_hw2()" . The function should load the VQA 2.0 validation set, load
 #  your trained network (you can assume that the model file is located in the script folder) and
 #  return the average accuracy on the val-set. This function should be written in a separate script.
@@ -44,15 +43,16 @@ if __name__ == '__main__':
         label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
     batch_size = 100 if running_on_linux else 96
-    num_workers = 12 if running_on_linux else 0
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                  collate_fn=lambda x: x, drop_last=False)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                collate_fn=lambda x: x, drop_last=False)
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, drop_last=False)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
 
     weights_path = 'weights/vqa_model_epoch_50_val_acc=0.27048.pth'
     model = torch.load(weights_path)
+    vqa_train_dataset.preprocess_questions(model)
+    vqa_val_dataset.preprocess_questions(model)
+    vqa_train_dataset.num_classes = model.num_classes
+    vqa_val_dataset.num_classes = model.num_classes
 
-    criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
+    criterion = nn.BCEWithLogitsLoss(reduction='sum')
     # evaluate(val_dataloader, model, criterion, np.inf, vqa_val_dataset)
     evaluate(train_dataloader, model, criterion, np.inf, vqa_train_dataset)

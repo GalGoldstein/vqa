@@ -17,23 +17,22 @@ import time
 
 
 class VQA(nn.Module):
-    def __init__(self, gru_params: dict, label2ans_path: str, target_type: str, img_feature_dim: int, padding: int,
+    def __init__(self, gru_params: dict, label2ans_path: str, img_feature_dim: int, padding: int,
                  dropout: float, pooling: str, activation: str):
         """
         gru_params:{word_embd_dim, question_hidden_dim, GRU_layers, train_questions_json_path}
         label2ans_path: path to dictionary connecting between answers and their representing indices
-        target_type: soft_scores (can be few possible answers with different scores, to the same question) or
-                    one-hot (the most frequent answer has score of 1, the other have 0)
         img_feature_dim: depth of output tensor of the cnn. number of different filters.
         padding: padding size for cnn. if image is 224x224x3, then padding=2 -> regions=5x5, padding=5 -> regions=7x7
                     when regions means number of squares in original image grid, to do attention on.
         dropout: probability to dropout on two places: after the element wise product, and before the last fc.
         pooling: pooling method for the image processing in the cnn network. should be max/average
-        activation: activation function for the whole parts ofthe network (e.g.: ReLU)
+        activation: activation function for the whole parts of the network (e.g.: ReLU)
         """
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.cnn = cnn.CNN(padding=padding, pooling=pooling).to(self.device)
         self.padding = padding
@@ -48,7 +47,6 @@ class VQA(nn.Module):
 
         self.lbl2ans = pickle.load(open(label2ans_path, "rb"))
         self.num_classes = len(self.lbl2ans)
-        self.target_type = target_type
 
         self.softmax = nn.Softmax(dim=1)
         self.activation = activation
@@ -75,45 +73,11 @@ class VQA(nn.Module):
         # last linear fully connected
         self.fc = weight_norm(nn.Linear(self.hidden_dim, self.num_classes, bias=False), dim=None)
 
-    def answers_to_one_hot(self, answers_labels_batch):
-        """
-            answers_labels_batch = [{label:count #people chose this label as answer} ... ]
-            return: all_answers, a tensor of labels of the individual correct answers (one for each question)
-        """
-        all_answers = list()
-        for labels_count_dict in answers_labels_batch:
-            if labels_count_dict:  # not empty dict
-                target_class = max(labels_count_dict, key=labels_count_dict.get)  # only the most common answer gets '1'
-            else:  # there are no answers for this question
-                target_class = self.num_classes  # last class is used for the questions without an answer
-            all_answers.append(target_class)
-
-        return torch.tensor(all_answers)
-
-    def answers_to_softscore(self, answers_batch, n_classes):
-        """
-            return: targets - tensor in shape [#question - #question_without_answer, n_classes] of the soft scores.
-                    idx_questions_without_answers: questions without answers. not in 'targets' tensor
-        """
-        idx_questions_without_answers = list()
-        targets = []
-        soft_scores = [{k: v for k, v in zip(sample['labels'], sample['scores'])} for sample in answers_batch]
-        for i, soft_score_dict in enumerate(soft_scores):
-            if soft_score_dict:
-                target = torch.zeros(n_classes)
-                for label, score in soft_score_dict.items():
-                    target[label] = score
-                targets.append(target)
-            else:  # none of the 10 participants answers to that question were passed the min occurrence
-                idx_questions_without_answers.append(i)
-
-        return idx_questions_without_answers, torch.stack(targets, dim=0).to(self.device)
-
     def forward(self, images_batch, questions_batch):
         # images_representation shape [batch_size , k , d] where k = number regions of image, d = dim of every feature
         images_representation = self.cnn(images_batch)
         # GRU supporting only single question and not batch
-        questions_last_hidden = [self.gru(self.gru.words_to_idx(question)) for question in questions_batch]
+        questions_last_hidden = self.gru(questions_batch)
         questions_representation = torch.stack(questions_last_hidden, dim=0).to(self.device)
 
         expand_dim = [images_representation.shape[1],  # k
@@ -150,52 +114,22 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
         accuracy = 0
         epoch_losses = list()
         for i_batch, batch in enumerate(dataloader):
-            if model.target_type == 'onehot':
-                # answers
-                answers_labels_batch = [sample['answer']['label_counts'] for sample in batch]
-                target = model.answers_to_one_hot(answers_labels_batch).to(model.device) # TODO GAL for example here, how did you know to move to to(device)?
-
-                # don't learn from questions without answers (mark their indices inside the batch)
-                # torch.nonzero - returns a tensor containing the indices of all non-zero elements of the input
-                idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
-                target = target[target != model.num_classes]
-            else:  # target_type=='softscore'
-                answers = [sample['answer'] for sample in batch]
-                idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
-
-            # each sample in batch is: {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
-
-            # filtering questions without answers:
-            # restack the images tensors to form a [batchsize X 3 X img_size X img_size] tensor
-            images_batch = torch.stack([sample['image'] for idx, sample in enumerate(batch)
-                                        if idx not in idx_questions_without_answers], dim=0).to(model.device)
-
-            # restack the questions (Natural language e.g. questions_batch_ = ['How many dogs?'...])
-            questions_batch = [sample['question'] for idx, sample in enumerate(batch)
-                               if idx not in idx_questions_without_answers]
+            images_batch = batch['image']
+            questions_batch = ['question']
+            target = batch['answer']  # in soft score
 
             # output is [batch_size,n_classes] tensors, not yet with probabilistic values
+            # 'output' will pass through sigmoid and then will be compared to 'targets' where values are 0/0.3/0.6/0.9/1
             output = model(images_batch, questions_batch)
-
-            # if 'soft_score': BCE loss, 'output' will pass through sigmoid and then will be compared to 'targets' where
-            #                  values are 0/0.3/0.6/0.9/1
-            # if 'one_hot': Cross entropy loss, 'output' will pass through softmax and then will be compared to
-            #                  'targets' where values are 0's except for one entry.
             loss = criterion(output, target)
             epoch_losses.append(float(loss))
 
-            # our prediction is only one answer, even in the soft-scores case TODO GAL why is that?
             pred = torch.argmax(output, dim=1)
-            scores = [{k: v for k, v in zip(sample['answer']['labels'], sample['answer']['scores'])}
-                      for idx, sample in enumerate(batch) if idx not in idx_questions_without_answers]
 
-            # our accuracy score is according to the soft-scores, even in the one-hot case
             for i, prediction in enumerate(pred):
-                sample_score = scores[i]  # scores[i] is {label: score} dict
-                if int(prediction) in sample_score:
-                    accuracy += sample_score[int(prediction)]
+                accuracy += target[i][int(prediction)]
 
-        acc = accuracy / len(dataset)
+        acc = accuracy / len(dataset.original_length)
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
         cur_epoch_loss = float(np.mean(epoch_losses))
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} loss = {round(cur_epoch_loss, 5)}")
@@ -207,40 +141,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
         return cur_epoch_loss, loss_not_improved, acc
 
 
-# TODO OPTIMIZATIONS:
-#  1. tricks:
-#   - Add weight normalization on all nn.Linear() layers (bottom_up git)
-#   - Add dropout (look at bottom_up git)
-#   - F.normalize(x, p=2, dim=1) image representations ??
-#   - question hidden dim 512 >> 1024 (and all the linear layers in VQA)
-#   - padding CNN to get bigger dim (current is 256)
-#  2. optimizers:
-#    A) torch.optim.Adadelta - no need to adjust lr
-#    B) torch.optim.Adamax
-#  3. More:
-#   - learning rate
-#   - batch size as big as possible
-#  4. Future:
-#   - Attention the question (how?)
-#  5. Improve data read process (for speed) -
-#   - Word to index and target - create them in Dataset
-#  Decisions:
-#  dropout: {0.0, 0.1, 0.2)}
-#  pooling: {Max, Avg}
-#  padding: {0, 2}
-#  hidden: {512, 1024}  (this number is both the hidden GRU dim and decides on the # of neurons)
-#  optimizer: {Adamax, Adadelta}
-#  .................................
-#  padding=0 or padding=2 (4 first blocks) (5*5 or 7*7) VVVVVVVVVVVVVVV
-#  hidden=512 or 1024, VVVVVVVVVVVVVVV
-#  Adamax / Adadelta VVVVVVVVVVVVVVV
-#  Augmentations (horizontal flip) **Yes** or No XXXXXXXXXX
-#  Weight normalization **Yes** or No, XXXXXXXXXX
-# nohup python -u vqa_model.py > 1.out&
-
-
-def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optimizer_name='Adamax', batch_size=64,
-         num_workers=0, activation='relu'):
+def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch_size=128, activation='relu'):
     # compute_targets(dir='datashare')  # need only once. TODO uncomment
     # comment next 3 if doesn't want to use wandb
     global vqa_train_dataset
@@ -295,26 +196,24 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
         # ....................................................................
 
         batch_size = batch_size if running_on_linux else 96
-        num_workers = num_workers if running_on_linux else 0
-        train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers,
-                                      collate_fn=lambda x: x, drop_last=False)
-        val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                    collate_fn=lambda x: x, drop_last=False)
+        train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, drop_last=False)
+        val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
 
         gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
                        'n_layers': GRU_layers, 'train_question_path': train_questions_json_path}
 
-        target_type = 'softscore'  # either 'onehot' for SingleLabel or 'sofscore' for MultiLabel
-        model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_, target_type=target_type,
+        model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_,
                     img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling,
                     activation=activation)
         model = model.to(model.device)
+        vqa_train_dataset.preprocess_questions(model)
+        vqa_val_dataset.preprocess_questions(model)
+        vqa_train_dataset.num_classes = model.num_classes
+        vqa_val_dataset.num_classes = model.num_classes
 
-        criterion = nn.CrossEntropyLoss() if model.target_type == 'onehot' else nn.BCEWithLogitsLoss(reduction='sum')
-        # initial_lr = None
+        criterion = nn.BCEWithLogitsLoss(reduction='sum')
         patience = 7  # how many epochs without val loss improvement to stop training
-        optimizer = optim.Adamax(model.parameters(), lr=lr) if optimizer_name == 'Adamax' else optim.Adadelta(
-            model.parameters())
+        optimizer = optim.Adamax(model.parameters(), lr=lr)
 
         print('============ Starting training ============')
         n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(model.parameters())])
@@ -330,14 +229,13 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
               f'padding = {model.padding}\n'
               f'activation = {activation}\n'
               f'dropout probability = {model.dropout_p}\n'
-              f'target_type = {model.target_type}\n'
-              f'num_workers = {num_workers}\n'
               f'Image model = {model.cnn._get_name()}\n'
               f'Question model = {model.gru._get_name()}\n'
               f'optimizer = {optimizer.__str__()}\n')
 
         best_val_loss = np.inf
-        epochs = 4  # TODO chnage for final run
+        epochs = 100  # TODO change to 35(?) for final run
+        # TODO change to 4
         count_no_improvement = 0
 
         for epoch in range(epochs):
@@ -347,31 +245,11 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
             model.train()
             for i_batch, batch in enumerate(train_dataloader):
                 optimizer.zero_grad()
-                if model.target_type == 'onehot':
-                    # answers
-                    answers_labels_batch_ = [sample['answer']['label_counts'] for sample in batch]
-                    target = model.answers_to_one_hot(answers_labels_batch_).to(model.device)
 
-                    # don't learn from questions without answers (take the batch indices of these questions)
-                    idx_questions_without_answers = torch.nonzero(target == model.num_classes, as_tuple=False)
-                    target = target[target != model.num_classes]
-                else:  # target_type='softscore'
-                    answers = [sample['answer'] for sample in batch]
-                    idx_questions_without_answers, target = model.answers_to_softscore(answers, model.num_classes)
+                images_batch_ = batch['image']
+                questions_batch_ = batch['question']
+                target = batch['answer']
 
-                # filtering questions without answers:
-                # restack the images tensors to form a [batchsize X 3 X img_size X img_size] tensor
-                images_batch_ = torch.stack([model.flip(sample['image'].cuda()) for idx, sample in enumerate(batch)
-                                             if idx not in idx_questions_without_answers], dim=0)
-
-                # restack the questions (Natural language e.g. questions_batch_ = ['How many dogs?'...])
-                questions_batch_ = [sample['question'] for idx, sample in enumerate(batch)
-                                    if idx not in idx_questions_without_answers]
-
-                # if 'soft_score': BCE loss, 'output' will pass through sigmoid and then will be compared to 'targets'
-                #                  where values are 0/0.3/0.6/0.9/1
-                # if 'one_hot': Cross entropy loss, 'output' will pass through softmax and then will be compared to
-                #               'targets' where values are 0's except for one entry.
                 output = model(images_batch_, questions_batch_)
                 loss = criterion(output, target)
                 loss.backward()
@@ -402,8 +280,9 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
                 wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
             # TODO uncomment for the last configuration !
-            # train_cur_epoch_loss, _, train_acc = \
-            #     evaluate(train_dataloader, model, criterion, best_val_loss, vqa_train_dataset)
+            # TODO ############################################ comment this
+            train_cur_epoch_loss, _, train_acc = \
+                evaluate(train_dataloader, model, criterion, best_val_loss, vqa_train_dataset)
             # if use_wandb:  # TODO delete the other .log above
             #     wandb.log({"Train Accuracy": train_acc, "Train Loss": train_cur_epoch_loss,
             #                "Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
@@ -430,6 +309,10 @@ def main(question_hidden_dim=512, padding=0, dropout_p=0.0, pooling='max', optim
 
 
 if __name__ == '__main__':
+    use_wandb = False
+    main()  # TODO
+    exit(1)
+
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
@@ -470,7 +353,7 @@ if __name__ == '__main__':
                     'values': [512, 768, 1024, 1280]
                 },
                 'padding': {
-                    'values': [2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224) TODO add 5
+                    'values': [2, 5]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
                 },
                 'pooling': {
                     'values': ['max']
@@ -478,7 +361,7 @@ if __name__ == '__main__':
                 'lr': {
                     'distribution': 'uniform',
                     'min': 0.002,
-                    'max': 0.01  # TODO
+                    'max': 0.006
                 },
                 'activation': {
                     'values': ['relu']

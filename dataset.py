@@ -10,7 +10,6 @@ from PIL import Image
 from torchvision import transforms
 import time
 import torchvision.transforms.functional as TF
-import gru
 
 
 class VQADataset(Dataset):
@@ -31,13 +30,23 @@ class VQADataset(Dataset):
             force_mem: upload all images tensors to RAM. can be True only if read_from_tensor_files is True
         """
         self.target = pickle.load(open(target_pickle_path, "rb"))
-        self.questions = json.load(open(questions_json_path))['questions'] # [{question object 1},{question object 2}..]
-        for question in self.questions:  # preprocess each question
-            question['question'] = ' '.join(gru.GRU.preprocess_question_string(question['question']))
+        self.questions = json.load(open(questions_json_path))['questions']  # [{question obj 1},{question obj 2}..]
+        self.original_length = len(self.target)  # the original original_length before filtering
+
+        # filter questions without answer
+        questions_without_answers_idxs = [i for i, answer in enumerate(self.target) if not answer['labels']]
+        for index in sorted(questions_without_answers_idxs, reverse=True):
+            del self.target[index]
+            del self.questions[index]
+
         self.img_path = images_path
         self.phase = phase
         self.read_pt = read_from_tensor_files
         self.load_imgs_to_mem = force_mem
+
+        # TODO delete
+        self.target = self.target[:128]
+        self.questions = self.questions[:128]
 
         if create_imgs_tensors:  # one time creation of img tensors resized
             self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
@@ -45,14 +54,22 @@ class VQADataset(Dataset):
 
         running_on_linux = 'Linux' in platform.platform()
         if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
-            # [-15:-3] for .pt files [-16:-4] fro .jpg files
-            images = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
+            # [-15:-3] for .pt files [-16:-4] for .jpg files
+            lower = -15 if read_from_tensor_files else -16
+            upper = -3 if read_from_tensor_files else -4
+            images = [int(s[lower:upper]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
 
         if force_mem:
             self.images_tensors = dict()
             self.read_images()
+
+    def preprocess_questions(self, vqa_model):
+        """convert a question in natural language to tensor of with words-index"""
+        for question in self.questions:  # preprocess each question
+            question['question'] = vqa_model.gru.words_to_idx(
+                vqa_model.gru.preprocess_question_string(question['question']))
 
     def read_images(self):
         """ can be used only if images already converted to tensors"""
@@ -88,10 +105,10 @@ class VQADataset(Dataset):
             os.remove(image_path)  # delete .jpg file
 
     def load_img_from_path(self, image_path):
-        if self.read_pt:  # tensors are already after resize, so we just wantto load
+        if self.read_pt:  # tensors are already after resize, so we just want to load
             image = torch.load(image_path)
 
-        else: # load images as jpg files
+        else:  # load images as jpg files
             image = Image.open(image_path).convert('RGB')
 
             # Resize
@@ -120,10 +137,16 @@ class VQADataset(Dataset):
         # {'question_id': 262148002, 'question_type': 'what is', 'image_id': 262148, 'label_counts': {79: 3, 11: 1},
         #  'labels': [79, 11], 'scores': [0.9, 0.3]}
 
+        # convert answer to soft-score target tensor
+        n_classes = self.num_classes
+        target = torch.zeros(n_classes)
+        for label, score in zip(answer_dict['labels'], answer_dict['scores']):
+            target[label] = score
+
         question_dict = self.questions[idx]
-        # e.g. question_dict = {'image_id': 262148, 'question': 'Where is he looking?', 'question_id': 262148000}
-        question_string = question_dict['question']
-        # e.g. question_string = 'Where is he looking?'
+        # e.g. question_dict = {'image_id': 262148, 'question': [0, 4, 6, 8] << tensor, 'question_id': 262148000}
+        indexed_question = question_dict['question']
+        # e.g. indexed_question = torch.tensor([0, 4, 6, 8, 0, 4, 6, 8, 0, 4, 6, 8, 3, 6]) << original_length 14 always
 
         # the image .jpg path contains 12 chars for image id
         image_id = str(question_dict['image_id']).zfill(12)
@@ -145,7 +168,7 @@ class VQADataset(Dataset):
                           f'image path: {image_path}\n')
                     time.sleep(3)
 
-        return {'image': image_tensor, 'question': question_string, 'answer': answer_dict}
+        return {'image': image_tensor, 'question': indexed_question, 'answer': target}
 
 
 if __name__ == '__main__':
@@ -153,28 +176,25 @@ if __name__ == '__main__':
     if running_on_linux:
         train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
-        images_path = '/home/student/HW2' # we moved the images from '/datashare' for faster reading, regardless the convert to tensors idea
+        images_path = '/home/student/HW2'  # we moved the images from '/datashare' for faster reading, regardless the convert to tensors idea
     else:
         train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
         val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
         images_path = 'data/images'
-
-    num_workers = 0 if running_on_linux else 0
 
     vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                    questions_json_path=train_questions_json_path,
                                    images_path=images_path,
                                    phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
                                    force_mem=False)  # TODO GAL what are the running options
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True,  # TODO GAL what is the chosen batch_size?
-                                  collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
+    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, drop_last=False)
+    # TODO GAL what is the chosen batch_size?
 
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                  questions_json_path=val_questions_json_path,
                                  images_path=images_path,
                                  phase='val', create_imgs_tensors=False, read_from_tensor_files=True, force_mem=False)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False,
-                                collate_fn=lambda x: x, num_workers=num_workers, drop_last=False)
+    val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, drop_last=False)
 
     for i_batch, batch in enumerate(train_dataloader):
         print(i_batch, batch)
