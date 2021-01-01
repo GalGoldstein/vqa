@@ -45,8 +45,8 @@ class VQADataset(Dataset):
         self.load_imgs_to_mem = force_mem
 
         # TODO delete
-        self.target = self.target[:256]
-        self.questions = self.questions[:256]
+        self.target = self.target[:192]
+        self.questions = self.questions[:192]
 
         if create_imgs_tensors:  # one time creation of img tensors resized
             self.imgs_ids = [int(s[-16:-4]) for s in os.listdir(os.path.join(self.img_path, f'{self.phase}2014'))]

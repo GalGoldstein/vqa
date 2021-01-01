@@ -323,7 +323,7 @@ if __name__ == '__main__':
                                      force_mem=True)
 
     use_wandb = False
-    main(question_hidden_dim=1280, padding=5, dropout_p=0.0, pooling='max', batch_size=256, activation='relu')  # TODO
+    main(question_hidden_dim=1280, padding=5, dropout_p=0.0, pooling='max', batch_size=192, activation='relu')  # TODO
     exit(1)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
@@ -367,7 +367,7 @@ if __name__ == '__main__':
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [128, 256]  # TODO might not work for 256
+                    'values': [128, 192]
                 }
             }
         }
