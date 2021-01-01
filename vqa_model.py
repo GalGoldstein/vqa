@@ -18,7 +18,7 @@ import time
 
 class VQA(nn.Module):
     def __init__(self, gru_params: dict, label2ans_path: str, img_feature_dim: int, padding: int,
-                 dropout: float, pooling: str, activation: str):
+                 dropout: float, pooling: str, activation: str, extra_block: bool = False):
         """
         gru_params:{word_embd_dim, question_hidden_dim, GRU_layers, train_questions_json_path}
         label2ans_path: path to dictionary connecting between answers and their representing indices
@@ -34,7 +34,7 @@ class VQA(nn.Module):
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        self.cnn = cnn.CNN(padding=padding, pooling=pooling)
+        self.cnn = cnn.CNN(padding=padding, pooling=pooling, extra_block=extra_block)
         self.padding = padding
         self.pooling = pooling
         self.flip = torchvision.transforms.RandomHorizontalFlip(p=0.5)
@@ -140,7 +140,8 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
         return cur_epoch_loss, loss_not_improved, acc
 
 
-def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch_size=128, activation='relu'):
+def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch_size=128, activation='relu',
+         extra_block=False):
     # compute_targets(dir='datashare')  # need only once. TODO uncomment
     # comment next 3 if doesn't want to use wandb
     global vqa_train_dataset
@@ -191,6 +192,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             lr = run.config.lr
             activation = run.config.activation  # 'relu' or 'selu'
             batch_size = run.config.batchsize
+            extra_block = run.config.extra_block
         # ....................................................................
 
         batch_size = batch_size if running_on_linux else 96
@@ -202,7 +204,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
         model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_,
                     img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling,
-                    activation=activation)
+                    activation=activation, extra_block=extra_block)
         model = model.to(model.device)
         if first_run:  # used for wandb runs to do only once
             first_run = False
@@ -308,6 +310,10 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
 if __name__ == '__main__':
     first_run = True
+    while os.system("ps -o cmd= {}".format(128802)) != 256:
+        print('waiting..')
+        time.sleep(60)
+    time.sleep(30)
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
         # defining the datasets here to later use in all wandb runs
@@ -352,6 +358,9 @@ if __name__ == '__main__':
                 'padding': {
                     'values': [2, 5]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
                 },
+                'extra_block': {
+                    'values': [True, False]  # extra cnn block. True = 512 filters, False = 256 Filters
+                },
                 'pooling': {
                     'values': ['max']
                 },
@@ -364,7 +373,8 @@ if __name__ == '__main__':
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [128, 192]  # TODO GAL what is the chosen batch_size?
+                    'values': [16, 16 * 2, 16 * 3, 16 * 4, 16 * 5, 16 * 6, 16 * 7, 16 * 8, 16 * 9, 16 * 10]
+                    # TODO GAL what is the chosen batch_size?
                 }
             }
         }
