@@ -309,10 +309,6 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
 
 if __name__ == '__main__':
-    use_wandb = False
-    main()  # TODO
-    exit(1)
-
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
@@ -325,6 +321,10 @@ if __name__ == '__main__':
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
                                      force_mem=True)
+
+    use_wandb = False
+    main()  # TODO
+    exit(1)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
