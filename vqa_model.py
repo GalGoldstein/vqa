@@ -114,7 +114,7 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
         epoch_losses = list()
         for i_batch, batch in enumerate(dataloader):
             images_batch = batch['image'].cuda()
-            questions_batch = ['question'].cuda()
+            questions_batch = batch['question'].cuda()
             target = batch['answer'].cuda()  # in soft score
 
             # output is [batch_size,n_classes] tensors, not yet with probabilistic values
