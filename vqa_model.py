@@ -37,7 +37,7 @@ class VQA(nn.Module):
         self.cnn = cnn.CNN(padding=padding, pooling=pooling)
         self.padding = padding
         self.pooling = pooling
-        self.flip = torchvision.transforms.RandomHorizontalFlip(p=0.5)
+        self.flip = torchvision.transforms.RandomHorizontalFlip(p=0.0)  # TODO 0.5 here
         self.gru = gru.GRU(gru_params['word_embd_dim'], gru_params['question_hidden_dim'], gru_params['n_layers'],
                            gru_params['train_question_path'])
         self.word_embd_dim = gru_params['word_embd_dim']
@@ -211,7 +211,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
         vqa_val_dataset.num_classes = model.num_classes
 
         criterion = nn.BCEWithLogitsLoss(reduction='sum')
-        patience = 100  # TODO change to 7  # how many epochs without val loss improvement to stop training
+        patience = 200  # TODO change to 7  # how many epochs without val loss improvement to stop training
         optimizer = optim.Adamax(model.parameters(), lr=lr)
 
         print('============ Starting training ============')
@@ -296,7 +296,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
                 best_val_loss = cur_epoch_loss
 
             print(f"========== Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ========")
-            torch.save(model, os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
+            # torch.save(model, os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))  # TODO uncomment
             torch.cuda.empty_cache()
 
             if count_no_improvement >= patience:
@@ -323,7 +323,7 @@ if __name__ == '__main__':
                                      force_mem=True)
 
     use_wandb = False
-    main()  # TODO
+    main(question_hidden_dim=1280, padding=5, dropout_p=0.0, pooling='max', batch_size=256, activation='relu')  # TODO
     exit(1)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
