@@ -146,6 +146,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
     global vqa_train_dataset
     global vqa_val_dataset
     global use_wandb
+    global first_run
     try:
         running_on_linux = 'Linux' in platform.platform()
 
@@ -203,8 +204,10 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
                     img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling,
                     activation=activation)
         model = model.to(model.device)
-        vqa_train_dataset.all_questions_to_word_idxs(model)
-        vqa_val_dataset.all_questions_to_word_idxs(model)
+        if first_run:  # used for wandb runs to do only once
+            first_run = False
+            vqa_train_dataset.all_questions_to_word_idxs(model)
+            vqa_val_dataset.all_questions_to_word_idxs(model)
         vqa_train_dataset.num_classes = model.num_classes
         vqa_val_dataset.num_classes = model.num_classes
 
@@ -304,6 +307,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
 
 if __name__ == '__main__':
+    first_run = True
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
         # defining the datasets here to later use in all wandb runs
@@ -354,7 +358,7 @@ if __name__ == '__main__':
                 'lr': {
                     'distribution': 'uniform',
                     'min': 0.002,
-                    'max': 0.006
+                    'max': 0.007
                 },
                 'activation': {
                     'values': ['relu']
