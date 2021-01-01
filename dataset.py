@@ -1,6 +1,5 @@
 import torch
 import os
-import psutil
 import json
 import pickle
 import platform
@@ -31,7 +30,7 @@ class VQADataset(Dataset):
         """
         self.target = pickle.load(open(target_pickle_path, "rb"))
         self.questions = json.load(open(questions_json_path))['questions']  # [{question obj 1},{question obj 2}..]
-        self.original_length = len(self.target)  # the original original_length before filtering
+        self.original_length = len(self.target)  # the original len before filtering - used for accuracy computations
 
         # filter questions without answer
         questions_without_answers_idxs = [i for i, answer in enumerate(self.target) if not answer['labels']]
@@ -49,7 +48,7 @@ class VQADataset(Dataset):
             self.save_imgs_tensors()  # create .pt files and delete .jpg files
 
         running_on_linux = 'Linux' in platform.platform()
-        if not running_on_linux:  # this 3 lines come to make sure we have all needed images in paths
+        if not running_on_linux:  # this lines come to make sure we have all needed images in paths (on windows)
             # [-15:-3] for .pt files [-16:-4] for .jpg files
             lower = -15 if read_from_tensor_files else -16
             upper = -3 if read_from_tensor_files else -4
@@ -57,28 +56,31 @@ class VQADataset(Dataset):
             self.target = [target for target in self.target if target['image_id'] in images]
             self.questions = [question for question in self.questions if question['image_id'] in images]
 
-        if force_mem:
+        if force_mem and read_from_tensor_files:
             self.images_tensors = dict()
-            self.read_images()
+            self.read_images_to_ram()
 
-    def preprocess_questions(self, vqa_model):
-        """convert a question in natural language to tensor of with words-index"""
+    def all_questions_to_word_idxs(self, vqa_model):
+        """
+        convert a question in natural language to tensor of with words-index
+        vqa_model is here because we need the vocabulary
+        """
         for question in self.questions:  # preprocess each question
+            # question['question'] is natural language question
             question['question'] = vqa_model.gru.words_to_idx(
                 vqa_model.gru.preprocess_question_string(question['question']))
 
-    def read_images(self):
+    def read_images_to_ram(self):
         """ can be used only if images already converted to tensors"""
         print(f'reading {self.phase} images to RAM')
         for image_id in set([q['image_id'] for q in self.questions]):
             # full path to image
-            # the image .jpg path contains 12 chars for image id
+            # the image path contains 12 chars for image id
             path = os.path.join(self.img_path, f'{self.phase}2014',
                                 f'COCO_{self.phase}2014_{str(image_id).zfill(12)}.pt')
             self.images_tensors[int(image_id)] = torch.load(path)
             if len(self.images_tensors) % 5000 == 0:
                 print(f'{self.phase}, len(self.images_tensors) = {len(self.images_tensors)}')
-                psutil.virtual_memory()
 
     def save_imgs_tensors(self):
         """
@@ -165,38 +167,3 @@ class VQADataset(Dataset):
                     time.sleep(3)
 
         return {'image': image_tensor, 'question': indexed_question, 'answer': target}
-
-
-if __name__ == '__main__':
-    running_on_linux = 'Linux' in platform.platform()
-    if running_on_linux:
-        train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
-        val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
-        images_path = '/home/student/HW2'  # we moved the images from '/datashare' for faster reading, regardless the convert to tensors idea
-    else:
-        train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
-        val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
-        images_path = 'data/images'
-
-    vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
-                                   questions_json_path=train_questions_json_path,
-                                   images_path=images_path,
-                                   phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                   force_mem=False)  # TODO GAL what are the running options
-    train_dataloader = DataLoader(vqa_train_dataset, batch_size=16, shuffle=True, drop_last=False)
-    # TODO GAL what is the chosen batch_size?
-
-    vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
-                                 questions_json_path=val_questions_json_path,
-                                 images_path=images_path,
-                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=True, force_mem=False)
-    val_dataloader = DataLoader(vqa_val_dataset, batch_size=16, shuffle=False, drop_last=False)
-
-    for i_batch, batch in enumerate(train_dataloader):
-        print(i_batch, batch)
-        print('\n\n\n\n\n\n\n\n\n')
-        break
-
-    for i_batch, batch in enumerate(val_dataloader):
-        print(i_batch, batch)
-        break

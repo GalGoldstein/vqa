@@ -151,7 +151,6 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
         if running_on_linux:
             train_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json'
-            val_questions_json_path = '/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json'
             label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
         else:
@@ -165,7 +164,6 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
                                          images_path='data/images',
                                          phase='val', create_imgs_tensors=False, read_from_tensor_files=True)
             train_questions_json_path = 'data/v2_OpenEnded_mscoco_train2014_questions.json'
-            val_questions_json_path = 'data/v2_OpenEnded_mscoco_val2014_questions.json'
             label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
         word_embd_dim = 300
@@ -180,7 +178,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
         activation = activation
         # ....................................................................
         run_id = ''
-        lr = 2e-3
+        lr = 2e-3  # Adamax default
         if use_wandb:
             run = wandb.init()
             run_id = '_id=' + str(run.id)
@@ -205,8 +203,8 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
                     img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling,
                     activation=activation)
         model = model.to(model.device)
-        vqa_train_dataset.preprocess_questions(model)
-        vqa_val_dataset.preprocess_questions(model)
+        vqa_train_dataset.all_questions_to_word_idxs(model)
+        vqa_val_dataset.all_questions_to_word_idxs(model)
         vqa_train_dataset.num_classes = model.num_classes
         vqa_val_dataset.num_classes = model.num_classes
 
@@ -308,11 +306,13 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 if __name__ == '__main__':
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
+        # defining the datasets here to later use in all wandb runs
         vqa_train_dataset = VQADataset(target_pickle_path='data/cache/train_target.pkl',
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/home/student/HW2',
                                        phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
                                        force_mem=True)
+        # TODO GAL what are the running options
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
@@ -360,7 +360,7 @@ if __name__ == '__main__':
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [128, 192]
+                    'values': [128, 192]  # TODO GAL what is the chosen batch_size?
                 }
             }
         }
