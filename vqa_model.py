@@ -102,7 +102,7 @@ class VQA(nn.Module):
         return self.fc(self.dropout(relu_mul_product))  # [batch_size,n_classes]
 
 
-def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
+def evaluate(dataloader, model, criterion, last_epoch_acc, dataset):
     """
     pass model through forward, without backward. can be done also on the train set, since we need to report measures
     on train set and on validation set.
@@ -132,12 +132,12 @@ def evaluate(dataloader, model, criterion, last_epoch_loss, dataset):
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} accuracy = {round(acc, 5)}")
         cur_epoch_loss = float(np.mean(epoch_losses))
         print(f"{'Validation' if dataset.phase == 'val' else 'Train'} loss = {round(cur_epoch_loss, 5)}")
-        if cur_epoch_loss < last_epoch_loss:
-            loss_not_improved = False
+        if acc > last_epoch_acc:
+            acc_not_improved = False
         else:
-            loss_not_improved = True
+            acc_not_improved = True
 
-        return cur_epoch_loss, loss_not_improved, acc
+        return cur_epoch_loss, acc_not_improved, acc
 
 
 def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch_size=128, activation='relu',
@@ -214,7 +214,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
         vqa_val_dataset.num_classes = model.num_classes
 
         criterion = nn.BCEWithLogitsLoss(reduction='sum')
-        patience = 7  # how many epochs without val loss improvement to stop training
+        patience = 7  # how many epochs without val acc improvement to stop training
         optimizer = optim.Adamax(model.parameters(), lr=lr)
 
         print('============ Starting training ============')
@@ -235,7 +235,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
               f'Question model = {model.gru._get_name()}\n'
               f'optimizer = {optimizer.__str__()}\n')
 
-        best_val_loss = np.inf
+        best_val_acc = 0
         epochs = 4  # TODO change to 35(?) for final run
         count_no_improvement = 0
 
@@ -275,29 +275,30 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             print(f"epoch took {round((time.time() - epoch_start_time) / 60, 2)} minutes")
 
             torch.cuda.empty_cache()
-            cur_epoch_loss, val_loss_didnt_improve, val_acc = \
-                evaluate(val_dataloader, model, criterion, best_val_loss, vqa_val_dataset)
+            cur_epoch_loss, val_acc_didnt_improve, cur_val_acc = \
+                evaluate(val_dataloader, model, criterion, best_val_acc, vqa_val_dataset)
             if use_wandb:
-                wandb.log({"Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
+                wandb.log({"Val Accuracy": cur_val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
             # TODO uncomment for the last configuration !
-            # train_cur_epoch_loss, _, train_acc = \
-            #     evaluate(train_dataloader, model, criterion, best_val_loss, vqa_train_dataset)
-            # if use_wandb:  # TODO delete the other .log above
-            #     wandb.log({"Train Accuracy": train_acc, "Train Loss": train_cur_epoch_loss,
-            #                "Val Accuracy": val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
+            # train_cur_epoch_loss, _, cur_train_acc = \
+            #     evaluate(train_dataloader, model, criterion, best_val_acc, vqa_train_dataset)
+            # if use_wandb:  # TODO delete the other .log above for the last configuration !
+            #     wandb.log({"Train Accuracy": cur_train_acc, "Train Loss": train_cur_epoch_loss,
+            #                "Val Accuracy": cur_val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
             # TODO GAL if we want to create charts, we need lists for losses and accuracies
 
-            if val_loss_didnt_improve:
+            if val_acc_didnt_improve:
                 count_no_improvement += 1
-                print(f'epoch {epoch + 1} didnt improve val loss. epochs without improvement = {count_no_improvement}')
+                print(f'epoch {epoch + 1} didnt improve val acc. epochs without improvement = {count_no_improvement}')
             else:
                 count_no_improvement = 0
-                best_val_loss = cur_epoch_loss
+                best_val_acc = cur_val_acc
 
-            print(f"========== Saving epoch {epoch + 1} model with validation accuracy = {round(val_acc, 5)} ========")
-            torch.save(model, os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(val_acc, 5)}.pth"))
+            print(f"======= Saving epoch {epoch + 1} model with validation accuracy = {round(cur_val_acc, 5)} =====")
+            torch.save(model,
+                       os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(cur_val_acc, 5)}.pth"))
             torch.cuda.empty_cache()
 
             if count_no_improvement >= patience:

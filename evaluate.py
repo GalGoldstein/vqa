@@ -39,7 +39,7 @@ def evaluate_hw2():
     vqa_val_dataset.num_classes = model.num_classes
 
     criterion = nn.BCEWithLogitsLoss(reduction='sum')
-    val_mean_loss, _, val_mean_acc = evaluate(val_dataloader, model, criterion, np.inf, vqa_val_dataset)
+    val_mean_loss, _, val_mean_acc = evaluate(val_dataloader, model, criterion, 0, vqa_val_dataset)
 
     return val_mean_loss, val_mean_acc
 
