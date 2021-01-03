@@ -309,10 +309,6 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
 
 if __name__ == '__main__':
-    while os.system("ps -o cmd= {}".format(111744)) != 256:
-        print('waiting..')
-        time.sleep(60)
-    time.sleep(60)
     first_run = True
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
@@ -341,7 +337,7 @@ if __name__ == '__main__':
 
         # define the hyperparameters
         sweep_config = {
-            'method': 'grid',
+            'method': 'random',
             'metric': {
                 'name': 'Val Accuracy',
                 'goal': 'maximize'
