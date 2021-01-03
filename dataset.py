@@ -71,15 +71,12 @@ class VQADataset(Dataset):
 
     def read_images_to_ram(self):
         """ can be used only if images already converted to tensors"""
-        print(f'reading {self.phase} images to RAM')
         for image_id in set([q['image_id'] for q in self.questions]):
             # full path to image
             # the image path contains 12 chars for image id
             path = os.path.join(self.img_path, f'{self.phase}2014',
                                 f'COCO_{self.phase}2014_{str(image_id).zfill(12)}.pt')
             self.images_tensors[int(image_id)] = torch.load(path)
-            if len(self.images_tensors) % 5000 == 0:
-                print(f'{self.phase}, len(self.images_tensors) = {len(self.images_tensors)}')
 
     def save_imgs_tensors(self):
         """
