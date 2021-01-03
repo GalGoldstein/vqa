@@ -32,7 +32,7 @@ class VQA(nn.Module):
         super(VQA, self).__init__()
         running_on_linux = 'Linux' in platform.platform()
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         self.cnn = cnn.CNN(padding=padding, pooling=pooling, extra_block=extra_block)
         self.padding = padding
@@ -195,7 +195,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             extra_block = run.config.extra_block
         # ....................................................................
 
-        batch_size = batch_size if running_on_linux else 96
+        batch_size = batch_size if running_on_linux else 8
         train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, drop_last=False)
         val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
 
@@ -247,7 +247,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             for i_batch, batch in enumerate(train_dataloader):
                 optimizer.zero_grad()
 
-                images_batch_ = batch['image'].cuda()
+                images_batch_ = model.flip(batch['image'].cuda())  # augmentation
                 questions_batch_ = batch['question'].cuda()
                 target = batch['answer'].cuda()
 
@@ -350,13 +350,13 @@ if __name__ == '__main__':
                     'max': 0.1
                 },
                 'hidden': {
-                    'values': [512, 768, 1024, 1280]
+                    'values': [1024, 1280, 1536]
                 },
-                'padding': {
-                    'values': [5, 2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
+                'padding': {  # TODO add 2 back
+                    'values': [5]  # , 2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
                 },
-                'extra_block': {
-                    'values': [True, False]  # extra cnn block. True = 512 filters, False = 256 Filters
+                'extra_block': {  # TODO switch back to False
+                    'values': [True]  # , False]  # extra cnn block. True = 512 filters, False = 256 Filters
                 },
                 'pooling': {
                     'values': ['max']
@@ -364,13 +364,13 @@ if __name__ == '__main__':
                 'lr': {
                     'distribution': 'uniform',
                     'min': 0.002,
-                    'max': 0.007
+                    'max': 0.004
                 },
                 'activation': {
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [16, 16 * 2, 16 * 3, 16 * 4, 16 * 5, 16 * 6, 16 * 7, 16 * 8, 16 * 9, 16 * 10]
+                    'values': [112, 128, 144, 160]
                     # TODO GAL what is the chosen batch_size?
                 }
             }

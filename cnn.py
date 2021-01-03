@@ -16,7 +16,7 @@ class CNN(nn.Module):
 
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         running_on_linux = 'Linux' in platform.platform()
-        self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
+        # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
         # formula to calc original_length (or width) of tensor after the conv layer:
         # (2 * padding_value) + previous_len_of_row_before_conv_layer - (kernel_size - 1) = len_of_row_after_conv_layer
