@@ -169,7 +169,6 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
         word_embd_dim = 300
-        img_feature_dim = 256 if not extra_block else 512
         GRU_layers = 1
 
         # ....................................................................
@@ -195,6 +194,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             extra_block = run.config.extra_block
         # ....................................................................
 
+        img_feature_dim = 256 if not extra_block else 512
         batch_size = batch_size if running_on_linux else 8
         train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, drop_last=False)
         val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
