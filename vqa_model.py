@@ -148,8 +148,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
     global vqa_val_dataset
     global use_wandb
     global first_run
-    if True:
-        # TODO try:
+    try:
         running_on_linux = 'Linux' in platform.platform()
 
         if running_on_linux:
@@ -305,14 +304,13 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             if count_no_improvement >= patience:
                 print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
                 break
-    # except Exception as e:
-    #     print(e)
-    #     print(f'ERROR FAILED')
+    except Exception as e:
+        print(e)
+        print(f'ERROR FAILED')
 
 
 if __name__ == '__main__':
     first_run = True
-    use_wandb = False  # TODO
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
         # defining the datasets here to later use in all wandb runs
@@ -320,14 +318,13 @@ if __name__ == '__main__':
                                        questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_train2014_questions.json',
                                        images_path='/home/student/HW2',
                                        phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
-                                       force_mem=False)  # TODO
+                                       force_mem=True)
         # TODO GAL what are the running options
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
                                      phase='val', create_imgs_tensors=False, read_from_tensor_files=True,
-                                     force_mem=False)  # TODO
-        main(question_hidden_dim=1280, extra_block=True, padding=5)  # TODO
+                                     force_mem=True)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
         use_wandb = True
