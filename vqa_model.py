@@ -169,7 +169,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             label2ans_path_ = 'data/cache/train_label2ans.pkl'
 
         word_embd_dim = 300
-        img_feature_dim = 256
+        img_feature_dim = 256 if not extra_block else 512
         GRU_layers = 1
 
         # ....................................................................
@@ -309,6 +309,10 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
 
 if __name__ == '__main__':
+    while os.system("ps -o cmd= {}".format(112294)) != 256:
+        print('waiting..')
+        time.sleep(60)
+    time.sleep(60)
     first_run = True
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
@@ -337,7 +341,7 @@ if __name__ == '__main__':
 
         # define the hyperparameters
         sweep_config = {
-            'method': 'bayes',
+            'method': 'grid',
             'metric': {
                 'name': 'Val Accuracy',
                 'goal': 'maximize'
@@ -352,7 +356,7 @@ if __name__ == '__main__':
                     'values': [512, 768, 1024, 1280]
                 },
                 'padding': {
-                    'values': [2, 5]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
+                    'values': [5, 2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
                 },
                 'extra_block': {
                     'values': [True, False]  # extra cnn block. True = 512 filters, False = 256 Filters
