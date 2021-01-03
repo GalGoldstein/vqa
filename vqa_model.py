@@ -148,7 +148,8 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
     global vqa_val_dataset
     global use_wandb
     global first_run
-    try:
+    if True:
+    # try:
         running_on_linux = 'Linux' in platform.platform()
 
         if running_on_linux:
@@ -304,9 +305,9 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             if count_no_improvement >= patience:
                 print(f"========================== Earlystopping epoch {epoch + 1} ==========================")
                 break
-    except Exception as e:
-        print(e)
-        print(f'ERROR FAILED')
+    # except Exception as e:
+    #     print(e)
+    #     print(f'ERROR FAILED')
 
 
 if __name__ == '__main__':
