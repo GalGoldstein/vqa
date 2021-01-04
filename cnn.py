@@ -9,10 +9,8 @@ https://medium.com/swlh/deep-learning-for-image-classification-creating-cnn-from
 
 
 class CNN(nn.Module):
-    def __init__(self, padding=0, pooling='max', extra_block=False):
+    def __init__(self, padding=0, pooling='max'):
         super(CNN, self).__init__()
-
-        assert not (extra_block and padding == 2)
 
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         running_on_linux = 'Linux' in platform.platform()
@@ -21,59 +19,32 @@ class CNN(nn.Module):
         # formula to calc original_length (or width) of tensor after the conv layer:
         # (2 * padding_value) + previous_len_of_row_before_conv_layer - (kernel_size - 1) = len_of_row_after_conv_layer
         # for example: 2*2 + 224 - (3 - 1) = 226
-        if extra_block:
-            self.convolutions = nn.Sequential(
-                nn.Conv2d(3, 16, kernel_size=3, padding=padding), nn.BatchNorm2d(16), nn.ReLU(),
-                nn.Conv2d(16, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
+        self.convolutions = nn.Sequential(
+            nn.Conv2d(3, 16, kernel_size=3, padding=padding), nn.BatchNorm2d(16), nn.ReLU(),
+            nn.Conv2d(16, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
 
-                nn.Conv2d(16, 32, kernel_size=3, padding=padding), nn.BatchNorm2d(32), nn.ReLU(),
-                nn.Conv2d(32, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
+            nn.Conv2d(16, 32, kernel_size=3, padding=padding), nn.BatchNorm2d(32), nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU(),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
 
-                nn.Conv2d(32, 64, kernel_size=3, padding=padding), nn.BatchNorm2d(64), nn.ReLU(),
-                nn.Conv2d(64, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=padding), nn.BatchNorm2d(64), nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU(),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
 
-                nn.Conv2d(64, 128, kernel_size=3, padding=padding), nn.BatchNorm2d(128), nn.ReLU(),
-                nn.Conv2d(128, 128, kernel_size=3), nn.BatchNorm2d(128), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=padding), nn.BatchNorm2d(128), nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3), nn.BatchNorm2d(128), nn.ReLU(),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
 
-                nn.Conv2d(128, 256, kernel_size=3, padding=padding), nn.BatchNorm2d(256), nn.ReLU(),
-                nn.Conv2d(256, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
+            nn.Conv2d(128, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
+            nn.Conv2d(256, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
+            nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
+        )
 
-                nn.Conv2d(256, 512, kernel_size=3), nn.BatchNorm2d(512), nn.ReLU(),
-                nn.Conv2d(512, 512, kernel_size=3), nn.BatchNorm2d(512), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2), )
-
-        else:
-            self.convolutions = nn.Sequential(
-                nn.Conv2d(3, 16, kernel_size=3, padding=padding), nn.BatchNorm2d(16), nn.ReLU(),
-                nn.Conv2d(16, 16, kernel_size=3), nn.BatchNorm2d(16), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
-
-                nn.Conv2d(16, 32, kernel_size=3, padding=padding), nn.BatchNorm2d(32), nn.ReLU(),
-                nn.Conv2d(32, 32, kernel_size=3), nn.BatchNorm2d(32), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
-
-                nn.Conv2d(32, 64, kernel_size=3, padding=padding), nn.BatchNorm2d(64), nn.ReLU(),
-                nn.Conv2d(64, 64, kernel_size=3), nn.BatchNorm2d(64), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
-
-                nn.Conv2d(64, 128, kernel_size=3, padding=padding), nn.BatchNorm2d(128), nn.ReLU(),
-                nn.Conv2d(128, 128, kernel_size=3), nn.BatchNorm2d(128), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
-
-                nn.Conv2d(128, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
-                nn.Conv2d(256, 256, kernel_size=3), nn.BatchNorm2d(256), nn.ReLU(),
-                nn.MaxPool2d(2, 2) if pooling == 'max' else nn.AvgPool2d(2, 2),
-            )
-
-            # note 1: We don't want padding in the last layers, since then the final output tensor will include
-            # padding pixels, and this tensor is much smaller than the original image (e.g. 5x5x256)
-            # note 2: BatchNorm2d is recommended after each conv layer, and the parameter is need to get is the current
-            # number of filters (which is depth of tensor, which is output value of the last conv layer
+        # note 1: We don't want padding in the last layers, since then the final output tensor will include
+        # padding pixels, and this tensor is much smaller than the original image (e.g. 5x5x256)
+        # note 2: BatchNorm2d is recommended after each conv layer, and the parameter is need to get is the current
+        # number of filters (which is depth of tensor, which is output value of the last conv layer
 
     def forward(self, x):
         with torch.cuda.amp.autocast():
@@ -84,7 +55,7 @@ class CNN(nn.Module):
 
 
 if __name__ == "__main__":
-    cnn = CNN(padding=5, pooling='avg', extra_block=True)
+    cnn = CNN(padding=2, pooling='max')
 
     n_params = sum([len(params.detach().cpu().numpy().flatten()) for params in list(cnn.parameters())])
     print(f'============ # CNN parameters: {n_params}============')

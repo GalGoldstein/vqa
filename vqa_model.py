@@ -18,7 +18,7 @@ import time
 
 class VQA(nn.Module):
     def __init__(self, gru_params: dict, label2ans_path: str, img_feature_dim: int, padding: int,
-                 dropout: float, pooling: str, activation: str, extra_block: bool = False):
+                 dropout: float, pooling: str, activation: str):
         """
         gru_params:{word_embd_dim, question_hidden_dim, GRU_layers, train_questions_json_path}
         label2ans_path: path to dictionary connecting between answers and their representing indices
@@ -34,7 +34,7 @@ class VQA(nn.Module):
         self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         # self.device = 'cpu' if (torch.cuda.is_available() and not running_on_linux) else self.device
 
-        self.cnn = cnn.CNN(padding=padding, pooling=pooling, extra_block=extra_block)
+        self.cnn = cnn.CNN(padding=padding, pooling=pooling)
         self.padding = padding
         self.pooling = pooling
         self.flip = torchvision.transforms.RandomHorizontalFlip(p=0.5)
@@ -140,8 +140,7 @@ def evaluate(dataloader, model, criterion, last_epoch_acc, dataset):
         return cur_epoch_loss, acc_not_improved, acc
 
 
-def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch_size=128, activation='relu',
-         extra_block=False):
+def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch_size=128, activation='relu'):
     # compute_targets(dir='datashare')  # need only once. TODO uncomment
     # comment next 3 if doesn't want to use wandb
     global vqa_train_dataset
@@ -191,10 +190,9 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             lr = run.config.lr
             activation = run.config.activation  # 'relu' or 'selu'
             batch_size = run.config.batchsize
-            extra_block = run.config.extra_block
         # ....................................................................
 
-        img_feature_dim = 256 if not extra_block else 512
+        img_feature_dim = 256
         batch_size = batch_size if running_on_linux else 8
         train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, drop_last=False)
         val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
@@ -204,7 +202,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
         model = VQA(gru_params=gru_params_, label2ans_path=label2ans_path_,
                     img_feature_dim=img_feature_dim, padding=padding, dropout=dropout_p, pooling=pooling,
-                    activation=activation, extra_block=extra_block)
+                    activation=activation)
         model = model.to(model.device)
         if first_run:  # used for wandb runs to do only once
             first_run = False
@@ -338,7 +336,7 @@ if __name__ == '__main__':
 
         # define the hyperparameters
         sweep_config = {
-            'method': 'random',
+            'method': 'bayes',
             'metric': {
                 'name': 'Val Accuracy',
                 'goal': 'maximize'
@@ -352,11 +350,8 @@ if __name__ == '__main__':
                 'hidden': {
                     'values': [1024, 1280, 1536]
                 },
-                'padding': {  # TODO add 2 back
-                    'values': [5]  # , 2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
-                },
-                'extra_block': {  # TODO switch back to False
-                    'values': [True]  # , False]  # extra cnn block. True = 512 filters, False = 256 Filters
+                'padding': {
+                    'values': [5, 2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
                 },
                 'pooling': {
                     'values': ['max']
