@@ -148,7 +148,6 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
     global vqa_val_dataset
     global use_wandb
     global first_run
-    global make_pairs
     try:
         running_on_linux = 'Linux' in platform.platform()
 
@@ -196,8 +195,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
         img_feature_dim = 256
         batch_size = batch_size if running_on_linux else 8
-        train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=False if make_pairs else True,
-                                      drop_last=False)
+        train_dataloader = DataLoader(vqa_train_dataset, batch_size=batch_size, shuffle=True, drop_last=False)
         val_dataloader = DataLoader(vqa_val_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
 
         gru_params_ = {'word_embd_dim': word_embd_dim, 'question_hidden_dim': question_hidden_dim,
@@ -310,32 +308,8 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
         print(f'ERROR FAILED')
 
 
-def make_question_pairs(vqa_train_dataset):
-    for question in vqa_train_dataset.questions:
-        question['question'] = ' '.join(gru.GRU.preprocess_question_string(question['question']))
-    questions_dict = dict()
-    for question in vqa_train_dataset.questions:
-        if question['question'] not in questions_dict:
-            questions_dict[question['question']] = [question]
-        else:
-            questions_dict[question['question']].append(question)
-    ordered_questions = collections.OrderedDict(sorted(questions_dict.items()))
-    paired_questions = list()
-    keys = list(ordered_questions.keys())
-    # while len(paired_questions) != len(vqa_train_dataset.questions):
-    while keys:
-        key = keys[np.random.randint(0, len(keys))]
-        choice = ordered_questions[key][-2:]
-        ordered_questions[key] = ordered_questions[key][:-2]
-        paired_questions.extend(choice)  # add to the list of all questions
-        if len(ordered_questions[key]) == 0:
-            keys.remove(key)  # remove key with no more questions
-    vqa_train_dataset.questions = paired_questions
-
-
 if __name__ == '__main__':
     first_run = True
-    make_pairs = True  # TODO tell Gal
     np.random.seed(42)
     if 'Linux' in platform.platform():
         torch.cuda.empty_cache()
@@ -345,9 +319,6 @@ if __name__ == '__main__':
                                        images_path='/home/student/HW2',
                                        phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
                                        force_mem=True)
-
-        if make_pairs:
-            make_question_pairs(vqa_train_dataset)
 
         # TODO GAL what are the running options
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
