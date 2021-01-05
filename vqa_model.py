@@ -376,14 +376,14 @@ if __name__ == '__main__':
             'parameters': {
                 'dropout': {
                     'distribution': 'uniform',
-                    'min': 0.0,
-                    'max': 0.1
+                    'min': 0.02,
+                    'max': 0.08
                 },
                 'hidden': {
                     'values': [1024, 1280, 1536]
                 },
                 'padding': {
-                    'values': [5, 2]  # 2 >> 5x5 || 5 >> 7x7 (with pic 3x224x224)
+                    'values': [2, 5]  # 2 >> 5x5 || 5 >> 7x7 (with image 3x224x224)
                 },
                 'pooling': {
                     'values': ['max']
@@ -397,7 +397,7 @@ if __name__ == '__main__':
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [112, 128, 144, 160]
+                    'values': [128, 144, 160, 176]
                     # TODO GAL what is the chosen batch_size?
                 }
             }
