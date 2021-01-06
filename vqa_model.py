@@ -339,7 +339,7 @@ if __name__ == '__main__':
 
         # define the hyperparameters
         sweep_config = {
-            'method': 'bayes',
+            'method': 'random',
             'metric': {
                 'name': 'Val Accuracy',
                 'goal': 'maximize'
@@ -348,13 +348,13 @@ if __name__ == '__main__':
                 'dropout': {
                     'distribution': 'uniform',
                     'min': 0.02,
-                    'max': 0.08
+                    'max': 0.045
                 },
                 'hidden': {
-                    'values': [1024, 1280, 1536]
+                    'values': [1024]
                 },
                 'padding': {
-                    'values': [2, 5]  # 2 >> 5x5 || 5 >> 7x7 (with image 3x224x224)
+                    'values': [2]  # 2 >> 5x5 || 5 >> 7x7 (with image 3x224x224)
                 },
                 'pooling': {
                     'values': ['max']
@@ -368,7 +368,7 @@ if __name__ == '__main__':
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [128, 144, 160, 176]
+                    'values': [176, 208, 240, 272, 304, 336, 368, 400]
                     # TODO GAL what is the chosen batch_size?
                 }
             }
