@@ -80,7 +80,7 @@ class VQADataset(Dataset):
 
     def save_imgs_tensors(self):
         """
-        take jps original image and resize it, normalize it, and convert it to tensor in float16 (pt file)
+        take jpgs original image and resize it, normalize it, and convert it to tensor in float16 (pt file)
         """
         resize = transforms.Resize(size=(224, 224))
         for img_id in self.imgs_ids:

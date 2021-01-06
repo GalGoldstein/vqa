@@ -77,7 +77,7 @@ class VQA(nn.Module):
     def forward(self, images_batch, questions_batch):
         # images_representation shape [batch_size , k , d] where k = number regions of image, d = dim of every feature
         images_representation = self.cnn(images_batch)
-        # GRU supporting only single question and not batch
+        # questions_representation shape [batch_size, hidden_q]
         questions_representation = self.gru(questions_batch)
 
         expand_dim = [images_representation.shape[1],  # k
@@ -369,7 +369,6 @@ if __name__ == '__main__':
                 },
                 'batchsize': {
                     'values': [176, 208, 240, 272, 304]
-                    # TODO GAL what is the chosen batch_size?
                 }
             }
         }
