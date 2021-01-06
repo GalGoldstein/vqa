@@ -32,6 +32,7 @@ class GRU(nn.Module):
 
         # Build questions word dict with number of appearances (counts) of each word
         self.word_dict = self.get_vocabs_counts()
+
         # init word embeddings. if word has less than min_freq appearances, it will get <unk> embedding.
         # <unk> will serve each test sample word that wasn't seen in the train set.
         # <pad> will serve for padding words, since we pad each question tobe in length 14 (=max length of all qs)
@@ -100,9 +101,9 @@ class GRU(nn.Module):
     def forward(self, questions_batch):
         # questions_batch: [batch_size, 14] for the 14 words indexes of the question (tensor of long type)
         word_embeddings = self.word_embedding(questions_batch)
-        output, _ = self.encoder(word_embeddings)
-        last_hidden = output.permute(1, 0, 2)[-1]  # take for every question the last hidden
-        return last_hidden  # return only last hidden state, of the last layer of GRU
+        output, _ = self.encoder(word_embeddings) #output from size [batch, max_question_len, hidden_size]
+        last_hidden = output.permute(1, 0, 2)[-1]  # take for every question the hidden of the 14th, i.e. last hidden
+        return last_hidden  # return only last hidden state, of the last layer of GRU. size of [batch,hidden_size]
 
 
 if __name__ == "__main__":
