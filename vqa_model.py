@@ -347,8 +347,8 @@ if __name__ == '__main__':
             'parameters': {
                 'dropout': {
                     'distribution': 'uniform',
-                    'min': 0.02,
-                    'max': 0.045
+                    'min': 0.03,
+                    'max': 0.05
                 },
                 'hidden': {
                     'values': [1024]
@@ -362,13 +362,13 @@ if __name__ == '__main__':
                 'lr': {
                     'distribution': 'uniform',
                     'min': 0.002,
-                    'max': 0.004
+                    'max': 0.006
                 },
                 'activation': {
                     'values': ['relu']
                 },
                 'batchsize': {
-                    'values': [176, 208, 240, 272, 304, 336, 368, 400]
+                    'values': [176, 208, 240, 272, 304]
                     # TODO GAL what is the chosen batch_size?
                 }
             }
