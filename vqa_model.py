@@ -362,7 +362,7 @@ if __name__ == '__main__':
                 'lr': {
                     'distribution': 'uniform',
                     'min': 0.002,
-                    'max': 0.006
+                    'max': 0.003
                 },
                 'activation': {
                     'values': ['relu']
