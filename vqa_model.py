@@ -142,7 +142,7 @@ def evaluate(dataloader, model, criterion, last_epoch_acc, dataset):
 
 
 def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch_size=128, activation='relu'):
-    # compute_targets(dir='datashare')  # need only once. TODO uncomment
+    compute_targets(dir='datashare')  # need only once.
     # comment next 3 if doesn't want to use wandb
     global vqa_train_dataset
     global vqa_val_dataset
@@ -235,7 +235,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
               f'optimizer = {optimizer.__str__()}\n')
 
         best_val_acc = 0
-        epochs = 4  # TODO change to 35(?) for final run
+        epochs = 30
         count_no_improvement = 0
 
         for epoch in range(epochs):
@@ -276,17 +276,12 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
             torch.cuda.empty_cache()
             cur_epoch_loss, val_acc_didnt_improve, cur_val_acc = \
                 evaluate(val_dataloader, model, criterion, best_val_acc, vqa_val_dataset)
+
+            train_cur_epoch_loss, _, cur_train_acc = \
+                evaluate(train_dataloader, model, criterion, best_val_acc, vqa_train_dataset)
             if use_wandb:
-                wandb.log({"Val Accuracy": cur_val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
-
-            # TODO uncomment for the last configuration !
-            # train_cur_epoch_loss, _, cur_train_acc = \
-            #     evaluate(train_dataloader, model, criterion, best_val_acc, vqa_train_dataset)
-            # if use_wandb:  # TODO delete the other .log above for the last configuration !
-            #     wandb.log({"Train Accuracy": cur_train_acc, "Train Loss": train_cur_epoch_loss,
-            #                "Val Accuracy": cur_val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
-
-            # TODO GAL if we want to create charts, we need lists for losses and accuracies
+                wandb.log({"Train Accuracy": cur_train_acc, "Train Loss": train_cur_epoch_loss,
+                           "Val Accuracy": cur_val_acc, "Val Loss": cur_epoch_loss, "epoch": epoch + 1})
 
             if val_acc_didnt_improve:
                 count_no_improvement += 1
@@ -320,7 +315,6 @@ if __name__ == '__main__':
                                        phase='train', create_imgs_tensors=False, read_from_tensor_files=True,
                                        force_mem=True)
 
-        # TODO GAL what are the running options
         vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',
                                      questions_json_path='/home/student/HW2/v2_OpenEnded_mscoco_val2014_questions.json',
                                      images_path='/home/student/HW2',
@@ -389,16 +383,33 @@ if __name__ == '__main__':
         torch.manual_seed(42)  # pytorch random seed
         torch.backends.cudnn.deterministic = True
 
-        # TODO put here the chosen configuration
         sweep_config = {
             'method': 'grid',
             'metric': {'name': 'Val Accuracy', 'goal': 'maximize'},
-            'parameters': {'dropout': {'values': [None]},
-                           'hidden': {'values': [None]},
-                           'padding': {'values': [None]},
-                           'pooling': {'values': [None]},
-                           'lr': {'values': [None]},
-                           'activation': {'values': [None]}}}
+            'parameters': {'dropout': {'values': [0.044554654240748025]},  # bksj02vg summer-sweep-3
+                           'hidden': {'values': [1024]},
+                           'padding': {'values': [2]},
+                           'pooling': {'values': ['max']},
+                           'lr': {'values': [0.00278321971132166]},
+                           'activation': {'values': ['relu']},
+                           'batchsize': {'values': [176]}}}
+
+        # create new sweep
+        sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")
+
+        # run the agent to execute the code
+        wandb.agent(sweep_id, function=main)
+
+        sweep_config = {
+            'method': 'grid',
+            'metric': {'name': 'Val Accuracy', 'goal': 'maximize'},
+            'parameters': {'dropout': {'values': [0.0380637602089466]},  # 0tjl9hjm charmed-sweep-16
+                           'hidden': {'values': [1024]},
+                           'padding': {'values': [2]},
+                           'pooling': {'values': ['max']},
+                           'lr': {'values': [0.002478443337173015]},
+                           'activation': {'values': ['relu']},
+                           'batchsize': {'values': [272]}}}
 
         # create new sweep
         sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")

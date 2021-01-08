@@ -8,12 +8,6 @@ import torch.nn as nn
 import os
 
 
-# TODO GAL: function called "evaluate_hw2()" . The function should load the VQA 2.0 validation set, load
-#  your trained network (you can assume that the model file is located in the script folder) and
-#  return the average accuracy on the val-set. This function should be written in a separate script.
-#  Use this line to load your model:
-#  model.load_state_dict(torch.load('model.pkl',map_location=lambda storage, loc: storage))
-
 def evaluate_hw2():
     """
     download data to current directory, convert to .pt files, upload images to RAM and evaluate on validation set
@@ -46,3 +40,4 @@ def evaluate_hw2():
 
 if __name__ == '__main__':
     loss, accuracy = evaluate_hw2()
+    print(f'VALIDATION RESULTS: loss={loss}, accuracy={accuracy}')

@@ -150,13 +150,13 @@ class VQADataset(Dataset):
         if self.load_imgs_to_mem:  # the images already as tensors on the RAM
             image_tensor = self.images_tensors[int(image_id)]
 
-        else:  # we will load the jpg file and convert it to tensor TODO Yotam to look at
+        else:  # we will load the jpg file and convert it to tensor
             for i in range(10):
                 try:  # full path to image
                     image_tensor = self.load_img_from_path(image_path)
                     break
 
-                except Exception as e:  # TODO Yotam to look at
+                except Exception as e:
                     print(f'{e}\n')
                     print(f'Failed in __getitem__ ... trying to load again\n'
                           f'image path: {image_path}\n')
