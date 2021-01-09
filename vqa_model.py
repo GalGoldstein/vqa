@@ -214,6 +214,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
 
         criterion = nn.BCEWithLogitsLoss(reduction='sum')
         patience = 7  # how many epochs without val acc improvement to stop training
+
         optimizer = optim.Adamax(model.parameters(), lr=lr)
 
         print('============ Starting training ============')
@@ -290,6 +291,7 @@ def main(question_hidden_dim=512, padding=2, dropout_p=0.0, pooling='max', batch
                 count_no_improvement = 0
                 best_val_acc = cur_val_acc
 
+
             print(f"======= Saving epoch {epoch + 1} model with validation accuracy = {round(cur_val_acc, 5)} =====")
             torch.save(model,
                        os.path.join("weights", f"vqa{run_id}_epoch_{epoch + 1}_val_acc={round(cur_val_acc, 5)}.pth"))
@@ -322,6 +324,7 @@ if __name__ == '__main__':
                                      force_mem=True)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'wandb':  # run this code with "python vqa_model.py wandb"
+        """here we optimize to hyperparameters tuning"""
         use_wandb = True
         import logging
         import wandb
@@ -374,6 +377,7 @@ if __name__ == '__main__':
         wandb.agent(sweep_id, function=main)
 
     else:  # run this code with "python vqa_model.py"
+        """here are the chosen 2 configurations"""
         use_wandb = True
         import logging
         import wandb
@@ -383,22 +387,22 @@ if __name__ == '__main__':
         torch.manual_seed(42)  # pytorch random seed
         torch.backends.cudnn.deterministic = True
 
-        sweep_config = {
-            'method': 'grid',
-            'metric': {'name': 'Val Accuracy', 'goal': 'maximize'},
-            'parameters': {'dropout': {'values': [0.044554654240748025]},  # bksj02vg summer-sweep-3
-                           'hidden': {'values': [1024]},
-                           'padding': {'values': [2]},
-                           'pooling': {'values': ['max']},
-                           'lr': {'values': [0.00278321971132166]},
-                           'activation': {'values': ['relu']},
-                           'batchsize': {'values': [176]}}}
-
-        # create new sweep
-        sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")
-
-        # run the agent to execute the code
-        wandb.agent(sweep_id, function=main)
+        # sweep_config = {
+        #     'method': 'grid',
+        #     'metric': {'name': 'Val Accuracy', 'goal': 'maximize'},
+        #     'parameters': {'dropout': {'values': [0.044554654240748025]},  # bksj02vg summer-sweep-3
+        #                    'hidden': {'values': [1024]},
+        #                    'padding': {'values': [2]},
+        #                    'pooling': {'values': ['max']},
+        #                    'lr': {'values': [0.00278321971132166]},
+        #                    'activation': {'values': ['relu']},
+        #                    'batchsize': {'values': [176]}}}
+        #
+        # # create new sweep
+        # sweep_id = wandb.sweep(sweep_config, entity="yotammartin", project="vqa")
+        #
+        # # run the agent to execute the code
+        # wandb.agent(sweep_id, function=main)
 
         sweep_config = {
             'method': 'grid',

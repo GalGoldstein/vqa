@@ -2,7 +2,6 @@ from vqa_model import evaluate
 from dataset import VQADataset
 from torch.utils.data import DataLoader
 from compute_softscore import compute_targets
-import numpy as np
 import torch
 import torch.nn as nn
 import os
@@ -27,7 +26,7 @@ def evaluate_hw2():
                                  phase='val', create_imgs_tensors=True, read_from_tensor_files=True, force_mem=True)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=128, shuffle=False, drop_last=False)
 
-    weights_path = ''  # TODO add the weights path
+    weights_path = 'vqa_id=wpladoyy_epoch_14_val_acc=0.50118.pth'
     model = torch.load(weights_path)
     vqa_val_dataset.all_questions_to_word_idxs(model)
     vqa_val_dataset.num_classes = model.num_classes
