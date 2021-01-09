@@ -1,4 +1,5 @@
 from vqa_model import evaluate
+from vqa_model import VQA
 from dataset import VQADataset
 from torch.utils.data import DataLoader
 from compute_softscore import compute_targets
@@ -12,18 +13,18 @@ def evaluate_hw2():
     download data to current directory, convert to .pt files, upload images to RAM and evaluate on validation set
     linux only
     """
-    # compute_targets(dir='datashare')
+    compute_targets(dir='datashare')
 
     # download validation set and convert to .pt files instead of .jpg
-    # os.system('wget "http://images.cocodataset.org/zips/val2014.zip"')
-    # os.system('unzip val2014.zip')
-    # os.system('rm val2014.zip')
+    os.system('wget "http://images.cocodataset.org/zips/val2014.zip"')
+    os.system('unzip val2014.zip')
+    os.system('rm val2014.zip')
 
     # argument create_imgs_tensors will convert all .jpg files to .pt files permanently
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',  # from compute_targets()
                                  questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                  images_path=os.getcwd(),  # current working directory
-                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=True, force_mem=True)
+                                 phase='val', create_imgs_tensors=True, read_from_tensor_files=True, force_mem=True)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=128, shuffle=False, drop_last=False)
 
     weights_path = os.path.join(os.getcwd(), 'vqa_id=wpladoyy_epoch_14_val_acc=0.50118.pkl')
