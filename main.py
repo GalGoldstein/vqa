@@ -23,7 +23,7 @@ def evaluate_hw2():
     vqa_val_dataset = VQADataset(target_pickle_path='data/cache/val_target.pkl',  # from compute_targets()
                                  questions_json_path='/datashare/v2_OpenEnded_mscoco_val2014_questions.json',
                                  images_path=os.getcwd(),  # current working directory
-                                 phase='val', create_imgs_tensors=True, read_from_tensor_files=True, force_mem=True)
+                                 phase='val', create_imgs_tensors=False, read_from_tensor_files=True, force_mem=True)
     val_dataloader = DataLoader(vqa_val_dataset, batch_size=128, shuffle=False, drop_last=False)
 
     weights_path = os.path.join(os.getcwd(), 'vqa_id=wpladoyy_epoch_14_val_acc=0.50118.pkl')
